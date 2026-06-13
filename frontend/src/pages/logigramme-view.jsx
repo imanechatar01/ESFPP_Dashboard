@@ -9,9 +9,10 @@ import { LogigrammeGrid } from "@/components/logigramme/LogigrammeGrid"
 import { useLogigrammeContext } from "@/contexts/logigramme-context"
 import { useLogigramme } from "@/hooks/useLogigramme"
 import { apiRequest } from "@/lib/api"
-import { CalendarDays, ChevronRight, FileSpreadsheet, Loader2, AlertCircle, LayoutGrid, Grid3X3 } from "lucide-react"
+import { CalendarDays, ChevronRight, FileSpreadsheet, Loader2, AlertCircle, LayoutGrid, Grid3X3, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { ImportModal } from "@/components/logigramme/ImportModal"
 
 const navItems = [
   { label: "Tableau de bord", path: "/admin/dashboard", icon: LayoutGrid },
@@ -25,6 +26,7 @@ export function LogigrammeView({ path, navigate }) {
   const [loadingList, setLoadingList] = useState(false)
   const [activeLogId, setActiveLogId] = useState(null)
   const [viewMode, setViewMode] = useState('grid') // 'grid' or 'heatmap'
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   
   const { 
     data: activeLog, 
@@ -73,27 +75,37 @@ export function LogigrammeView({ path, navigate }) {
       
       <div className="flex items-center justify-between mb-4">
         <FilterBar className="mb-0 flex-1" />
-        <div className="flex bg-muted/30 p-1 rounded-xl border border-border ml-4">
-          <button 
-            onClick={() => setViewMode('grid')}
-            className={cn(
-              "flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-              viewMode === 'grid' ? "bg-white text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"
-            )}
+        <div className="flex items-center gap-3 ml-4">
+          <Button 
+            onClick={() => setIsImportModalOpen(true)}
+            className="rounded-xl font-bold uppercase tracking-widest text-[10px] h-[38px] px-4"
           >
-            <Grid3X3 className="size-3.5" />
-            Grille
-          </button>
-          <button 
-            onClick={() => setViewMode('heatmap')}
-            className={cn(
-              "flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-              viewMode === 'heatmap' ? "bg-white text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <LayoutGrid className="size-3.5" />
-            Heatmap
-          </button>
+            <Upload className="size-3.5 mr-2" />
+            Importer Excel
+          </Button>
+
+          <div className="flex bg-muted/30 p-1 rounded-xl border border-border">
+            <button 
+              onClick={() => setViewMode('grid')}
+              className={cn(
+                "flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                viewMode === 'grid' ? "bg-white text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Grid3X3 className="size-3.5" />
+              Grille
+            </button>
+            <button 
+              onClick={() => setViewMode('heatmap')}
+              className={cn(
+                "flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                viewMode === 'heatmap' ? "bg-white text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <LayoutGrid className="size-3.5" />
+              Heatmap
+            </button>
+          </div>
         </div>
       </div>
 
@@ -169,6 +181,12 @@ export function LogigrammeView({ path, navigate }) {
         </main>
       </div>
       )}
+
+      <ImportModal 
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImportSuccess={fetchList}
+      />
     </DashboardShell>
   )
 }

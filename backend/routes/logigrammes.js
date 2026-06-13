@@ -1,6 +1,21 @@
 // backend/routes/logigrammes.js
 import express from 'express';
 import { supabaseAdmin } from '../lib/supabase.js';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { spawnSync } from 'child_process';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const uploadDir = path.join(__dirname, '../uploads/');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const upload = multer({ dest: uploadDir });
 
 const router = express.Router();
 
@@ -382,6 +397,248 @@ router.put('/:id/auto-complete', async (req, res) => {
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/logigramme/import
+router.post('/import', upload.single('file'), async (req, res) => {
+  const { academic_year_id } = req.body;
+  const file = req.file;
+
+  if (!academic_year_id) {
+    if (file) fs.unlinkSync(file.path);
+    return res.status(400).json({ error: 'academic_year_id est requis.' });
+  }
+
+  if (!file) {
+    return res.status(400).json({ error: 'Aucun fichier téléchargé.' });
+  }
+
+  const filePath = file.path;
+
+  try {
+    // 1. Get sheet names from Python parser
+    const pythonScriptPath = path.join(__dirname, '../scripts/parse_xls.py');
+    const sheetsResult = spawnSync('python3', [
+      pythonScriptPath,
+      '--file', filePath,
+      '--list-sheets'
+    ]);
+
+    if (sheetsResult.error || sheetsResult.status !== 0) {
+      const errorMsg = sheetsResult.stderr ? sheetsResult.stderr.toString() : 'Impossible de lister les feuilles.';
+      throw new Error(errorMsg);
+    }
+
+    const sheets = JSON.parse(sheetsResult.stdout.toString());
+    const importedLogs = [];
+
+    // 2. Fetch academic year details
+    const { data: yearData, error: yearError } = await supabaseAdmin
+      .from('academic_years')
+      .select('*')
+      .eq('id', academic_year_id)
+      .single();
+
+    if (yearError || !yearData) {
+      throw new Error(`Année académique introuvable : ${yearError?.message || 'inconnue'}`);
+    }
+
+    // 3. Process each sheet (excluding Feuil1)
+    for (const sheetName of sheets) {
+      if (sheetName === 'Feuil1') continue;
+
+      // Run Python parser for the sheet
+      const dataResult = spawnSync('python3', [
+        pythonScriptPath,
+        '--file', filePath,
+        '--sheet', sheetName
+      ]);
+
+      if (dataResult.error || dataResult.status !== 0) {
+        console.error(`Error parsing sheet ${sheetName}:`, dataResult.stderr?.toString());
+        continue;
+      }
+
+      const data = JSON.parse(dataResult.stdout.toString());
+      const { metadata, unites, weeks } = data;
+
+      if (!metadata.filiere || !metadata.classe) {
+        console.warn(`Skipping sheet ${sheetName} due to missing filiere or classe metadata`);
+        continue;
+      }
+
+      // a. Upsert Filière
+      const filiereName = metadata.filiere.trim();
+      const FILIERE_CODES = {
+        'aide-soignant': 'AS',
+        'aide soignant': 'AS',
+        'infirmier en réanimation': 'REA',
+        'infirmier en reanimation': 'REA',
+        'infirmier anesthésiste': 'IA',
+        'infirmier anesthesiste': 'IA',
+        'infirmier auxiliaire': 'IA',
+        'infirmier polyvalent': 'IP',
+        'radiologie': 'RADIO',
+      };
+      const filiereCode = FILIERE_CODES[filiereName.toLowerCase()] || filiereName.substring(0, 5).toUpperCase().trim();
+      
+      const { data: filData, error: filError } = await supabaseAdmin
+        .from('filieres')
+        .upsert({ 
+          code: filiereCode, 
+          name: filiereName, 
+          niveau: metadata.niveau.trim() || 'QUALIFICATION'
+        }, { onConflict: 'code' })
+        .select()
+        .single();
+
+      if (filError) throw filError;
+      const filiereId = filData.id;
+
+      // b. Upsert Classe
+      let annee = 1;
+      if (metadata.classe.includes('2')) annee = 2;
+      if (metadata.classe.includes('3')) annee = 3;
+
+      const { data: clData, error: clError } = await supabaseAdmin
+        .from('classes')
+        .upsert({
+          filiere_id: filiereId,
+          label: metadata.classe,
+          annee: annee
+        }, { onConflict: 'filiere_id, annee' })
+        .select()
+        .single();
+
+      if (clError) throw clError;
+      const classeId = clData.id;
+
+      // c. Upsert Logigramme
+      const { data: logData, error: logError } = await supabaseAdmin
+        .from('logigrammes')
+        .upsert({
+          filiere_id: filiereId,
+          classe_id: classeId,
+          academic_year_id: academic_year_id
+        }, { onConflict: 'filiere_id, classe_id, academic_year_id' })
+        .select()
+        .single();
+
+      if (logError) throw logError;
+      const logigrammeId = logData.id;
+
+      // d. Insert year_weeks (once per year/week)
+      const weekDateMap = {};
+      for (let i = 0; i < weeks.length; i++) {
+        const weekDate = weeks[i];
+        if (!weekDate) continue;
+        
+        const dateObj = new Date(weekDate);
+        const mois = dateObj.toLocaleString('fr-FR', { month: 'long' });
+        const semestre = (i + 1) <= 26 ? 1 : 2;
+
+        const { data: ywData, error: ywError } = await supabaseAdmin
+          .from('year_weeks')
+          .upsert({
+            academic_year_id: academic_year_id,
+            semaine: i + 1,
+            week_start_date: weekDate,
+            mois: mois.charAt(0).toUpperCase() + mois.slice(1),
+            semestre: semestre
+          }, { onConflict: 'academic_year_id, semaine' })
+          .select()
+          .single();
+        
+        if (ywError) throw ywError;
+        weekDateMap[i + 1] = weekDate;
+      }
+
+      // e. Process Unités and Cells
+      for (const unit of unites) {
+        let formateurId = null;
+        if (unit.formateur) {
+          // Find or create formateur
+          const { data: existingF, error: sError } = await supabaseAdmin
+            .from('formateurs')
+            .select('id')
+            .eq('nom', unit.formateur)
+            .maybeSingle();
+          
+          if (existingF) {
+            formateurId = existingF.id;
+          } else {
+            const { data: newF, error: iError } = await supabaseAdmin
+              .from('formateurs')
+              .insert({ nom: unit.formateur })
+              .select()
+              .single();
+            
+            if (iError) {
+              console.error(`Error inserting formateur "${unit.formateur}":`, iError);
+            } else {
+              formateurId = newF.id;
+            }
+          }
+        }
+
+        // Upsert Unit
+        const { data: uData, error: uError } = await supabaseAdmin
+          .from('unites_formation')
+          .upsert({
+            logigramme_id: logigrammeId,
+            ordre: unit.ordre,
+            nom: unit.nom,
+            formateur_id: formateurId,
+            vhg: unit.vhg
+          }, { onConflict: 'logigramme_id, ordre' })
+          .select()
+          .single();
+
+        if (uError) throw uError;
+        const uniteId = uData.id;
+
+        // Insert Cells
+        if (unit.cells && unit.cells.length > 0) {
+          const cellInserts = unit.cells.map(c => ({
+            unite_id: uniteId,
+            semaine: c.week,
+            week_start_date: weekDateMap[c.week],
+            cell_type: c.type,
+            heures: c.value
+          })).filter(c => c.week_start_date); // Safety check
+
+          if (cellInserts.length > 0) {
+            const { error: cellError } = await supabaseAdmin
+              .from('week_cells')
+              .upsert(cellInserts, { onConflict: 'unite_id, semaine' });
+            if (cellError) throw cellError;
+          }
+        }
+      }
+
+      importedLogs.push({
+        sheetName,
+        filiere: filiereName,
+        classe: metadata.classe,
+        unitsCount: unites.length
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Importation réussie de ${importedLogs.length} programmes.`,
+      importedLogs
+    });
+
+  } catch (err) {
+    console.error('Import error:', err);
+    res.status(500).json({ error: err.message });
+  } finally {
+    // Always clean up uploaded file
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
   }
 });
 
