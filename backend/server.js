@@ -1,7 +1,15 @@
 import express from "express"
-import { createClient } from "@supabase/supabase-js"
 import dotenv from "dotenv"
 import cors from "cors"
+import { supabase, supabaseAdmin } from "./lib/supabase.js"
+import { requireAuth, requireRole, requireServiceRole, getRole } from "./lib/auth.js"
+
+// Routes
+import logigrammesRouter from "./routes/logigrammes.js"
+import completionRouter from "./routes/completion.js"
+import filieresRouter from "./routes/filieres.js"
+import formateursRouter from "./routes/formateurs.js"
+import yearsRouter from "./routes/academic-years.js"
 
 dotenv.config()
 
@@ -9,69 +17,9 @@ const app = express()
 
 const PORT = process.env.PORT || 3000
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173"
-const SUPABASE_URL = process.env.SUPABASE_URL
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
-
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  throw new Error("SUPABASE_URL and SUPABASE_ANON_KEY are required")
-}
-
-if (!SUPABASE_SERVICE_ROLE_KEY) {
-  console.warn("SUPABASE_SERVICE_ROLE_KEY is missing. Admin invitation APIs will fail until it is configured.")
-}
 
 app.use(cors({ origin: FRONTEND_URL, credentials: true }))
 app.use(express.json())
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-  },
-})
-
-function getRole(user) {
-  return user?.user_metadata?.role === "admin" ? "admin" : "student"
-}
-
-function requireServiceRole(req, res, next) {
-  if (!SUPABASE_SERVICE_ROLE_KEY) {
-    return res.status(500).json({ error: "Server is missing SUPABASE_SERVICE_ROLE_KEY" })
-  }
-
-  next()
-}
-
-async function requireAuth(req, res, next) {
-  const authHeader = req.headers.authorization || ""
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : ""
-
-  if (!token) {
-    return res.status(401).json({ error: "Missing bearer token" })
-  }
-
-  const { data, error } = await supabase.auth.getUser(token)
-
-  if (error || !data.user) {
-    return res.status(401).json({ error: "Invalid session" })
-  }
-
-  req.user = data.user
-  req.role = getRole(data.user)
-  next()
-}
-
-function requireRole(role) {
-  return (req, res, next) => {
-    if (req.role !== role) {
-      return res.status(403).json({ error: "Forbidden" })
-    }
-
-    next()
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Health
@@ -94,6 +42,41 @@ app.get("/api/me", requireAuth, (req, res) => {
     },
   })
 })
+
+// ---------------------------------------------------------------------------
+// Admin — Logigramme & Completion
+// ---------------------------------------------------------------------------
+
+app.use("/api/logigramme", requireAuth, requireRole("admin"), logigrammesRouter)
+app.use("/api/completion", requireAuth, requireRole("admin"), completionRouter)
+app.use("/api/filieres", requireAuth, requireRole("admin"), filieresRouter)
+app.use("/api/formateurs", requireAuth, requireRole("admin"), formateursRouter)
+app.use("/api/years", requireAuth, requireRole("admin"), yearsRouter)
+
+// ---------------------------------------------------------------------------
+// Student — Read-only Logigramme
+// ---------------------------------------------------------------------------
+
+app.get("/api/student/logigramme", requireAuth, async (req, res) => {
+    // Students can see logigrammes for their own filiere
+    // For now, let's just return what's available
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('logigrammes')
+            .select(`
+                id,
+                filiere:filieres (id, code, name),
+                classe:classes (id, label, annee),
+                academic_year:academic_years (label)
+            `)
+            .eq('academic_years.is_current', true);
+        
+        if (error) throw error;
+        res.json(data);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 // ---------------------------------------------------------------------------
 // Admin — list users (with profile status from DB)

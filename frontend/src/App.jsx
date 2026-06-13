@@ -7,6 +7,11 @@ import { AdminDashboard } from "@/pages/admin-dashboard"
 import { StudentDashboard } from "@/pages/student-dashboard"
 import { AccountManagement } from "@/pages/account-management"
 import { CompleteAccount } from "@/pages/complete-account"
+import { LogigrammeView } from "@/pages/logigramme-view"
+import FilieresManagement from "@/pages/filieres-management"
+import FormateursManagement from "@/pages/formateurs-management"
+import AcademicYears from "@/pages/academic-years"
+import { LogigrammeProvider } from "@/contexts/logigramme-context"
 import { useCallback, useEffect, useState } from "react"
 
 function usePath() {
@@ -58,18 +63,17 @@ function AppRoutes() {
     return <CompleteAccount navigate={navigate} />
   }
 
-  if (path === "/admin/dashboard") {
+  if (path.startsWith("/admin/")) {
     return (
       <RequireRole role="admin" navigate={navigate}>
-        <AdminDashboard path={path} navigate={navigate} />
-      </RequireRole>
-    )
-  }
-
-  if (path === "/admin/accounts") {
-    return (
-      <RequireRole role="admin" navigate={navigate}>
-        <AccountManagement path={path} navigate={navigate} />
+        <LogigrammeProvider>
+          {path === "/admin/dashboard" && <AdminDashboard path={path} navigate={navigate} />}
+          {path === "/admin/accounts" && <AccountManagement path={path} navigate={navigate} />}
+          {path === "/admin/logigrammes" && <LogigrammeView path={path} navigate={navigate} />}
+          {path === "/admin/filieres" && <FilieresManagement path={path} navigate={navigate} />}
+          {path === "/admin/formateurs" && <FormateursManagement path={path} navigate={navigate} />}
+          {path === "/admin/academic-years" && <AcademicYears path={path} navigate={navigate} />}
+        </LogigrammeProvider>
       </RequireRole>
     )
   }

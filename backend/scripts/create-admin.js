@@ -151,7 +151,7 @@ const { error: profileError } = await supabaseAdmin.from("profiles").upsert({
   first_name: ADMIN_FIRST_NAME,
   last_name: ADMIN_LAST_NAME,
   status: "active",
-  completed_at: new Date().toISOString(),
+  role: "admin",
 })
 
 if (profileError) {
