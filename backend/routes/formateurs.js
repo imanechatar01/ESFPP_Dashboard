@@ -132,7 +132,7 @@ router.get('/:id/unites', async (req, res) => {
       ...u,
       cells: u.cells.map(c => ({
         ...c,
-        completion_status: c.completion?.[0]?.status || 'pending'
+        completion_status: c.completion?.status || 'pending'
       }))
     }));
 

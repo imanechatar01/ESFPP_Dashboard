@@ -1,6 +1,6 @@
 export function Legend() {
   return (
-    <div className="p-4 bg-muted/30 border-t border-border flex flex-wrap gap-x-6 gap-y-3 items-center">
+    <div className="px-3 py-1.5 bg-muted/30 border-t border-border flex flex-wrap gap-x-5 gap-y-2 items-center">
        <div className="flex items-center gap-2 flex-shrink-0">
           <div className="w-3.5 h-3.5 bg-yellow-50 border border-yellow-100 rounded" />
           <span className="text-[10px] font-bold uppercase text-muted-foreground whitespace-nowrap">Session normale</span>

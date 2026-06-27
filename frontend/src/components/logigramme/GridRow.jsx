@@ -18,7 +18,7 @@ export function GridRow({ unite, weeksCount = 52, onToggleCell, highlightWeeks =
   return (
     <div className="flex w-fit hover:bg-muted/30 transition-colors group">
       {/* Sticky Left Panel */}
-      <div className="sticky left-0 z-10 flex bg-card border-b group-hover:bg-muted/50 transition-colors">
+      <div className="flex bg-card border-b group-hover:bg-muted/50 transition-colors">
         <div className="w-10 h-10 border-r flex items-center justify-center text-[10px] font-bold text-muted-foreground">{ordre}</div>
         <div className="w-64 h-10 border-r flex items-center px-3 text-[11px] font-bold truncate" title={nom}>{nom}</div>
         <div className="w-40 h-10 border-r flex items-center px-3 text-[10px] font-medium text-muted-foreground truncate" title={formateur?.nom}>{formateur?.nom || '—'}</div>
@@ -38,7 +38,7 @@ export function GridRow({ unite, weeksCount = 52, onToggleCell, highlightWeeks =
       </div>
 
       {/* Sticky Right Panel - Progress */}
-      <div className="sticky right-0 z-10 w-24 h-10 bg-card border-b border-l flex items-center px-2 group-hover:bg-muted/50 transition-colors">
+      <div className="w-24 h-10 bg-card border-b border-l flex items-center px-2 group-hover:bg-muted/50 transition-colors">
         <div className="w-full">
            <div className="flex justify-between text-[9px] font-black mb-0.5">
              <span>{Math.round(vh_realise)}h</span>

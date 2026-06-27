@@ -2,13 +2,38 @@ import xlrd
 import json
 import argparse
 import sys
+import re
+import unicodedata
 from datetime import datetime
+
+sys.stdout.reconfigure(encoding='utf-8')
 
 def get_rgb(xf, book):
     """Returns (R, G, B) tuple for a given XF object's background color."""
     bg_color_index = xf.background.pattern_colour_index
     rgb = book.colour_map.get(bg_color_index)
     return rgb
+
+def normalize_label(value):
+    value = str(value).strip().lower()
+    value = unicodedata.normalize("NFKD", value)
+    return "".join(ch for ch in value if not unicodedata.combining(ch))
+
+def find_week_date_row(sheet, start_col=4, end_col=56):
+    best_row = 10
+    best_count = 0
+
+    for row_idx in range(min(sheet.nrows, 25)):
+        date_count = 0
+        for col_idx in range(start_col, min(end_col, sheet.ncols)):
+            if sheet.cell(row_idx, col_idx).ctype == xlrd.XL_CELL_DATE:
+                date_count += 1
+
+        if date_count > best_count:
+            best_row = row_idx
+            best_count = date_count
+
+    return best_row, best_count
 
 def parse_xls(file_path, sheet_name):
     try:
@@ -32,9 +57,14 @@ def parse_xls(file_path, sheet_name):
     # Row 10 (index 10): Week start dates
     # Rows 11+ (index 11+): Data rows
     
+    week_date_row, week_date_count = find_week_date_row(sheet)
+    data_start_row = week_date_row + 1
+
+    print(f"[parse_xls] Sheet '{sheet_name}': week_date_row={week_date_row}, dates_found={week_date_count}, data_start_row={data_start_row}, total_rows={sheet.nrows}", file=sys.stderr)
+
     week_dates = []
     for col in range(4, 56): # Cols 4-55 (52 weeks)
-        cell = sheet.cell(10, col)
+        cell = sheet.cell(week_date_row, col)
         if cell.ctype == xlrd.XL_CELL_DATE:
             dt = xlrd.xldate_as_datetime(cell.value, book.datemode)
             week_dates.append(dt.strftime("%Y-%m-%d"))
@@ -43,7 +73,7 @@ def parse_xls(file_path, sheet_name):
             week_dates.append(None)
 
     unites = []
-    for row_idx in range(11, sheet.nrows):
+    for row_idx in range(data_start_row, sheet.nrows):
         # Stop at 'Total' in col 2 or if col 0 is empty
         unit_num_cell = sheet.cell(row_idx, 0)
         unit_name_cell = sheet.cell(row_idx, 1)
@@ -62,7 +92,13 @@ def parse_xls(file_path, sheet_name):
         unit_name = str(unit_name_cell.value).strip()
         
         # Skip empty rows or structural rows that aren't real units
-        if not unit_name or any(skip in unit_name.lower() for skip in ["vacance", "examen", "travaux individuels", "tiff"]):
+        # Use word-boundary regex for 'tiff' to avoid matching substrings in unit names
+        if not unit_name:
+            continue
+        unit_lower = unit_name.lower()
+        if any(skip in unit_lower for skip in ["vacance", "examen", "travaux individuels"]):
+            continue
+        if re.search(r'\btiff\b', unit_lower):
             continue
 
         formateur = str(sheet.cell(row_idx, 2).value).strip()
@@ -120,7 +156,10 @@ def parse_xls(file_path, sheet_name):
             "cells": cells
         })
 
+    print(f"[parse_xls] Sheet '{sheet_name}': parsed {len(unites)} unité(s), {sum(len(u['cells']) for u in unites)} total cells", file=sys.stderr)
+
     # Metadata extraction (Search first 10 rows)
+    # Uses normalize_label (accent-safe) for all checks
     metadata = {
         "filiere": "",
         "niveau": "",
@@ -128,27 +167,38 @@ def parse_xls(file_path, sheet_name):
         "annee_acad": ""
     }
     
-    for r in range(10):
-        for c in range(5):
+    for r in range(min(10, sheet.nrows)):
+        for c in range(min(5, sheet.ncols)):
             try:
                 val = str(sheet.cell(r, c).value).strip()
-                if "filière:" in val.lower():
-                    metadata["filiere"] = val.split(":", 1)[1].strip()
-                elif "niveau:" in val.lower():
-                    metadata["niveau"] = val.split(":", 1)[1].strip()
-                elif "classe:" in val.lower():
-                    metadata["classe"] = val.split(":", 1)[1].strip()
-                elif "année de formation:" in val.lower():
-                    metadata["annee_acad"] = val.split(":", 1)[1].strip()
-                elif "année académique:" in val.lower():
-                    metadata["annee_acad"] = val.split(":", 1)[1].strip()
+                if ":" not in val:
+                    continue
+                normalized_val = normalize_label(val)
+                raw_value = val.split(":", 1)[1].strip()
+                if "filiere:" in normalized_val:
+                    metadata["filiere"] = raw_value
+                elif "niveau:" in normalized_val:
+                    metadata["niveau"] = raw_value
+                elif "classe:" in normalized_val:
+                    metadata["classe"] = raw_value
+                elif "annee de formation:" in normalized_val or "annee academique:" in normalized_val:
+                    metadata["annee_acad"] = raw_value
             except:
                 pass
+
+    print(f"[parse_xls] Sheet '{sheet_name}': metadata={json.dumps(metadata, ensure_ascii=False)}", file=sys.stderr)
+    if not metadata["filiere"] or not metadata["classe"]:
+        print(f"[parse_xls] ⚠ WARNING: Missing filiere or classe metadata for sheet '{sheet_name}'!", file=sys.stderr)
 
     return {
         "metadata": metadata,
         "unites": unites,
-        "weeks": week_dates
+        "weeks": week_dates,
+        "debug": {
+            "week_date_row": week_date_row,
+            "week_date_count": week_date_count,
+            "data_start_row": data_start_row
+        }
     }
 
 if __name__ == "__main__":

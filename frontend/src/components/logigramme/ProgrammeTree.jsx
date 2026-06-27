@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, Activity } from 'lucide-react';
+import { ChevronDown, ChevronRight, Activity, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export function ProgrammeTree({ list, activeLogId, onSelect }) {
+export function ProgrammeTree({ list, activeLogId, onSelect, onDelete }) {
   // Group by filiere
   const groups = list.reduce((acc, log) => {
     const filiereId = log.filiere?.id || 'unknown';
@@ -17,20 +17,21 @@ export function ProgrammeTree({ list, activeLogId, onSelect }) {
   }, {});
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {Object.values(groups).map((group) => (
         <FiliereSection 
           key={group.filiere.id} 
           group={group} 
           activeLogId={activeLogId} 
-          onSelect={onSelect} 
+          onSelect={onSelect}
+          onDelete={onDelete}
         />
       ))}
     </div>
   );
 }
 
-function FiliereSection({ group, activeLogId, onSelect }) {
+function FiliereSection({ group, activeLogId, onSelect, onDelete }) {
   const [isExpanded, setIsExpanded] = useState(true);
   
   const avgTaux = group.items.reduce((sum, item) => sum + (item.taux || 0), 0) / group.items.length;
@@ -40,7 +41,7 @@ function FiliereSection({ group, activeLogId, onSelect }) {
     <div className="space-y-1">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-muted/50 transition-colors group"
+        className="w-full flex items-center justify-between p-1.5 rounded-lg hover:bg-muted/50 transition-colors group"
       >
         <div className="flex items-center gap-2 overflow-hidden">
           <div className="relative size-8 flex-shrink-0">
@@ -71,43 +72,61 @@ function FiliereSection({ group, activeLogId, onSelect }) {
               : 0;
 
             return (
-              <button
-                key={log.id}
-                onClick={() => onSelect(log.id)}
-                className={cn(
-                  "w-full flex flex-col p-2.5 rounded-xl border transition-all hover:translate-x-1",
-                  activeLogId === log.id 
-                    ? "bg-primary border-primary shadow-sm" 
-                    : "bg-card border-border hover:border-primary/30"
-                )}
-              >
-                <div className="flex justify-between items-center mb-1.5">
-                  <span className={cn(
-                    "text-[10px] font-black uppercase tracking-tight",
-                    activeLogId === log.id ? "text-white" : "text-foreground"
+              <div key={log.id} className="relative group/card">
+                <button
+                  onClick={() => onSelect(log.id)}
+                  className={cn(
+                    "w-full flex flex-col p-2 rounded-lg border transition-all hover:translate-x-1",
+                    activeLogId === log.id 
+                      ? "bg-primary border-primary shadow-sm" 
+                      : "bg-card border-border hover:border-primary/30"
+                  )}
+                >
+                  <div className="flex justify-between items-center mb-1.5">
+                    <span className={cn(
+                      "text-[10px] font-black uppercase tracking-tight",
+                      activeLogId === log.id ? "text-white" : "text-foreground"
+                    )}>
+                      {log.classe?.label || '???'}
+                    </span>
+                    <span className={cn(
+                      "text-[9px] font-black",
+                      activeLogId === log.id ? "text-white" : "text-primary"
+                    )}>
+                      {progressValue}%
+                    </span>
+                  </div>
+                  <div className={cn(
+                    "h-1 w-full rounded-full overflow-hidden",
+                    activeLogId === log.id ? "bg-white/20" : "bg-muted"
                   )}>
-                    {log.classe?.label || '???'}
-                  </span>
-                  <span className={cn(
-                    "text-[9px] font-black",
-                    activeLogId === log.id ? "text-white" : "text-primary"
-                  )}>
-                    {progressValue}%
-                  </span>
-                </div>
-                <div className={cn(
-                  "h-1 w-full rounded-full overflow-hidden",
-                  activeLogId === log.id ? "bg-white/20" : "bg-muted"
-                )}>
-                  <div 
+                    <div 
+                      className={cn(
+                        "h-full transition-all duration-500",
+                        activeLogId === log.id ? "bg-white" : "bg-primary"
+                      )}
+                      style={{ width: `${progressValue}%` }}
+                    />
+                  </div>
+                </button>
+                {onDelete && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(log.id, `${group.filiere.name} — ${log.classe?.label}`);
+                    }}
                     className={cn(
-                      "h-full transition-all duration-500",
-                      activeLogId === log.id ? "bg-white" : "bg-primary"
+                      "absolute -top-1.5 -right-1.5 size-6 rounded-full flex items-center justify-center transition-all",
+                      "bg-destructive/90 text-white shadow-md",
+                      "opacity-0 scale-75 group-hover/card:opacity-100 group-hover/card:scale-100",
+                      "hover:bg-destructive hover:shadow-lg"
                     )}
-                    style={{ width: `${progressValue}%` }}
-                  />
-                </div>
-              </button>
+                    title="Supprimer ce logigramme"
+                  >
+                    <Trash2 className="size-3" />
+                  </button>
+                )}
+              </div>
             );
           })}
         </div>

@@ -180,6 +180,8 @@ async function run() {
             mois: mois.charAt(0).toUpperCase() + mois.slice(1),
             semestre: semestre
           }, { onConflict: 'academic_year_id, semaine' });
+
+        weekDateMap[i + 1] = weekDate;
       }
 
       // e. Process Unités and Cells

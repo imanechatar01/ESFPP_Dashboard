@@ -18,8 +18,8 @@ export function LogigrammeGrid({ data, loading, onToggleCell, onMarkWeek }) {
   const { weeks, unites } = data;
 
   return (
-    <div className="relative rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
-      <div className="overflow-x-auto overflow-y-auto max-h-[70vh] custom-scrollbar">
+    <div className="relative rounded-xl border border-border bg-card overflow-hidden shadow-sm">
+      <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-220px)] custom-scrollbar">
         <div className="w-fit min-w-full">
           <GridHeader
             weeks={weeks}

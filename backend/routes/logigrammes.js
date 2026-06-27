@@ -19,13 +19,24 @@ const upload = multer({ dest: uploadDir });
 
 const router = express.Router();
 
+async function getYearWeekDateMap(academicYearId) {
+  const { data, error } = await supabaseAdmin
+    .from('year_weeks')
+    .select('semaine, week_start_date')
+    .eq('academic_year_id', academicYearId);
+
+  if (error) throw error;
+
+  return Object.fromEntries((data || []).map(w => [w.semaine, w.week_start_date]));
+}
+
 // Helper to get the current academic year ID
 async function getCurrentYearId() {
   const { data, error } = await supabaseAdmin
-  .from('academic_years')
-  .select('id')
-  .eq('is_current', true)
-  .single();
+    .from('academic_years')
+    .select('id')
+    .eq('is_current', true)
+    .single();
   if (error || !data) return null;
   return data.id;
 }
@@ -93,7 +104,7 @@ router.get('/kpis', async (req, res) => {
       const cells = unit.cells || [];
       for (const cell of cells) {
         if (cell.cell_type === 'normal') {
-          const status = cell.completion?.[0]?.status;
+          const status = cell.completion?.status;
           if (status === 'done' || status === 'auto_done') {
             totalRealise += (parseFloat(cell.heures) || 0);
           }
@@ -113,92 +124,6 @@ router.get('/kpis', async (req, res) => {
   }
 });
 
-// GET /api/logigramme/heatmap
-router.get('/heatmap', async (req, res) => {
-  let { year_id, filiere_id } = req.query;
-
-  try {
-    if (!year_id) {
-      const currentYearId = await getCurrentYearId();
-      if (currentYearId) year_id = currentYearId;
-    }
-
-    // 1. Get Weeks
-    const { data: weeks, error: weeksError } = await supabaseAdmin
-      .from('year_weeks')
-      .select('*')
-      .eq('academic_year_id', year_id)
-      .order('semaine');
-
-    if (weeksError) throw weeksError;
-
-    // 2. Get Logigrammes
-    let logQuery = supabaseAdmin
-      .from('logigrammes')
-      .select(`
-        id,
-        filiere:filieres (name),
-        classe:classes (label)
-      `)
-      .eq('academic_year_id', year_id);
-
-    if (filiere_id) logQuery = logQuery.eq('filiere_id', filiere_id);
-
-    const { data: logs, error: logsError } = await logQuery;
-    if (logsError) throw logsError;
-
-    // 3. Get Completion Data for all cells in these logigrammes
-    const logIds = logs.map(l => l.id);
-    const { data: cells, error: cellsError } = await supabaseAdmin
-      .from('week_cells')
-      .select(`
-        id,
-        semaine,
-        cell_type,
-        unite:unites_formation (logigramme_id),
-        completion:completions (status)
-      `)
-      .in('unite_id', (
-        await supabaseAdmin.from('unites_formation').select('id').in('logigramme_id', logIds)
-      ).data.map(u => u.id))
-      .eq('cell_type', 'normal');
-
-    if (cellsError) throw cellsError;
-
-    // 4. Group by logigramme and week
-    const heatmapRows = logs.map(log => {
-      const logCells = cells.filter(c => c.unite.logigramme_id === log.id);
-      
-      const weekly_completion = [];
-      const weeksWithCells = [...new Set(logCells.map(c => c.semaine))];
-
-      for (const sem of weeksWithCells) {
-        const weekCells = logCells.filter(c => c.semaine === sem);
-        const doneCount = weekCells.filter(c => 
-          c.completion?.[0]?.status === 'done' || c.completion?.[0]?.status === 'auto_done'
-        ).length;
-
-        weekly_completion.push({
-          semaine: sem,
-          taux: doneCount / weekCells.length,
-          total_cells: weekCells.length
-        });
-      }
-
-      return {
-        logigramme_id: log.id,
-        label: `${log.filiere.name} — ${log.classe.label}`,
-        weekly_completion
-      };
-    });
-
-    res.json({ weeks, rows: heatmapRows });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // GET /api/logigramme/list
 router.get('/list', async (req, res) => {
   let { year_id, filiere_id, classe_id, formateur_id } = req.query;
@@ -212,14 +137,14 @@ router.get('/list', async (req, res) => {
 
     // Build base query for logigrammes
     let query = supabaseAdmin
-    .from('logigrammes')
-    .select(`
-    id,
-    auto_complete,
-    filiere:filieres (id, code, name, niveau),
-            classe:classes (id, label, annee),
-            academic_year:academic_years (id, label)
-            `);
+      .from('logigrammes')
+      .select(`
+        id,
+        auto_complete,
+        filiere:filieres (id, code, name, niveau),
+        classe:classes (id, label, annee),
+        academic_year:academic_years (id, label)
+      `);
 
     if (year_id) query = query.eq('academic_year_id', year_id);
     if (filiere_id) query = query.eq('filiere_id', filiere_id);
@@ -237,10 +162,10 @@ router.get('/list', async (req, res) => {
     if (formateur_id) {
       const logIds = logigrammes.map(l => l.id);
       const { data: units, error: unitsError } = await supabaseAdmin
-      .from('unites_formation')
-      .select('logigramme_id')
-      .eq('formateur_id', formateur_id)
-      .in('logigramme_id', logIds);
+        .from('unites_formation')
+        .select('logigramme_id')
+        .eq('formateur_id', formateur_id)
+        .in('logigramme_id', logIds);
       if (unitsError) throw unitsError;
       const matchingLogIds = new Set(units.map(u => u.logigramme_id));
       filteredLogigrammes = logigrammes.filter(l => matchingLogIds.has(l.id));
@@ -250,18 +175,18 @@ router.get('/list', async (req, res) => {
     const enrichedLogigrammes = await Promise.all(filteredLogigrammes.map(async (log) => {
       // Get units for this logigramme
       const { data: units, error: unitsError } = await supabaseAdmin
-      .from('unites_formation')
-      .select(`
-      id,
-      vhg,
-      cells:week_cells (
-        id,
-        cell_type,
-        heures,
-        completion:completions (status)
-      )
-      `)
-      .eq('logigramme_id', log.id);
+        .from('unites_formation')
+        .select(`
+          id,
+          vhg,
+          cells:week_cells (
+            id,
+            cell_type,
+            heures,
+            completion:completions (status)
+          )
+        `)
+        .eq('logigramme_id', log.id);
 
       if (unitsError) {
         console.error(unitsError);
@@ -276,7 +201,7 @@ router.get('/list', async (req, res) => {
         const cells = unit.cells || [];
         for (const cell of cells) {
           if (cell.cell_type === 'normal') {
-            const status = cell.completion?.[0]?.status;
+            const status = cell.completion?.status;
             if (status === 'done' || status === 'auto_done') {
               vh_realise += parseFloat(cell.heures) || 0;
             }
@@ -302,51 +227,51 @@ router.get('/list', async (req, res) => {
   }
 });
 
-// GET /api/logigramme/:id (unchanged, but ensure it works)
+// GET /api/logigramme/:id
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
     // 1. Fetch Logigramme Meta
     const { data: logigramme, error: logError } = await supabaseAdmin
-    .from('logigrammes')
-    .select(`
-    id,
-    auto_complete,
-    filiere:filieres (*),
-            classe:classes (*),
-            academic_year:academic_years (*)
-            `)
-    .eq('id', id)
-    .single();
+      .from('logigrammes')
+      .select(`
+        id,
+        auto_complete,
+        filiere:filieres (*),
+        classe:classes (*),
+        academic_year:academic_years (*)
+      `)
+      .eq('id', id)
+      .single();
 
     if (logError) throw logError;
 
     // 2. Fetch Weeks for this year
     const { data: weeks, error: weeksError } = await supabaseAdmin
-    .from('year_weeks')
-    .select('*')
-    .eq('academic_year_id', logigramme.academic_year.id)
-    .order('semaine');
+      .from('year_weeks')
+      .select('*')
+      .eq('academic_year_id', logigramme.academic_year.id)
+      .order('semaine');
 
     if (weeksError) throw weeksError;
 
     // 3. Fetch Unites and Cells (Sparse)
     const { data: unites, error: unitesError } = await supabaseAdmin
-    .from('unites_formation')
-    .select(`
-    *,
-    formateur:formateurs (*),
-      cells:week_cells (
-        id,
-        semaine,
-        cell_type,
-        heures,
-        completion:completions (status)
-      )
+      .from('unites_formation')
+      .select(`
+        *,
+        formateur:formateurs (*),
+        cells:week_cells (
+          id,
+          semaine,
+          cell_type,
+          heures,
+          completion:completions (status)
+        )
       `)
-    .eq('logigramme_id', id)
-    .order('ordre');
+      .eq('logigramme_id', id)
+      .order('ordre');
 
     if (unitesError) throw unitesError;
 
@@ -354,12 +279,12 @@ router.get('/:id', async (req, res) => {
     const processedUnites = unites.map(u => {
       const processedCells = u.cells.map(c => ({
         ...c,
-        completion_status: c.completion?.[0]?.status || 'pending'
+        completion_status: c.completion?.status || 'pending'
       }));
 
       const vh_realise = processedCells
-      .filter(c => c.cell_type === 'normal' && (c.completion_status === 'done' || c.completion_status === 'auto_done'))
-      .reduce((sum, c) => sum + (parseFloat(c.heures) || 0), 0);
+        .filter(c => c.cell_type === 'normal' && (c.completion_status === 'done' || c.completion_status === 'auto_done'))
+        .reduce((sum, c) => sum + (parseFloat(c.heures) || 0), 0);
 
       return {
         ...u,
@@ -380,22 +305,106 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// PUT /api/logigramme/:id/auto-complete (unchanged)
+// PUT /api/logigramme/:id/auto-complete
 router.put('/:id/auto-complete', async (req, res) => {
   const { id } = req.params;
   const { auto_complete } = req.body;
 
   try {
     const { data, error } = await supabaseAdmin
-    .from('logigrammes')
-    .update({ auto_complete })
-    .eq('id', id)
-    .select()
-    .single();
+      .from('logigrammes')
+      .update({ auto_complete })
+      .eq('id', id)
+      .select()
+      .single();
 
     if (error) throw error;
     res.json(data);
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/logigramme/:id
+router.delete('/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const { data: existing, error: findError } = await supabaseAdmin
+      .from('logigrammes')
+      .select('id, filiere:filieres(name), classe:classes(label)')
+      .eq('id', id)
+      .single();
+
+    if (findError) throw findError;
+    if (!existing) return res.status(404).json({ error: 'Logigramme introuvable.' });
+
+    // CASCADE handles unites_formation → week_cells → completions automatically
+    const { error: deleteError } = await supabaseAdmin
+      .from('logigrammes')
+      .delete()
+      .eq('id', id);
+
+    if (deleteError) throw deleteError;
+
+    console.log(`[logigramme] Deleted logigramme ${id} (${existing.filiere?.name} — ${existing.classe?.label})`);
+    res.status(200).json({ success: true, deleted: existing });
+  } catch (err) {
+    console.error('[logigramme] Delete error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/logigramme/:id/unites — Batch update unités (nom, vhg, formateur_id)
+router.put('/:id/unites', async (req, res) => {
+  const { id } = req.params;
+  const { unites } = req.body;
+
+  if (!Array.isArray(unites) || unites.length === 0) {
+    return res.status(400).json({ error: 'Le champ "unites" est requis (tableau non vide).' });
+  }
+
+  try {
+    const { data: existing, error: findError } = await supabaseAdmin
+      .from('logigrammes')
+      .select('id')
+      .eq('id', id)
+      .single();
+
+    if (findError || !existing) {
+      return res.status(404).json({ error: 'Logigramme introuvable.' });
+    }
+
+    const results = [];
+    for (const unit of unites) {
+      if (!unit.id) continue;
+
+      const updatePayload = {};
+      if (unit.nom !== undefined) updatePayload.nom = unit.nom;
+      if (unit.vhg !== undefined) updatePayload.vhg = parseFloat(unit.vhg) || 0;
+      if (unit.formateur_id !== undefined) updatePayload.formateur_id = unit.formateur_id || null;
+
+      if (Object.keys(updatePayload).length === 0) continue;
+
+      const { data, error } = await supabaseAdmin
+        .from('unites_formation')
+        .update(updatePayload)
+        .eq('id', unit.id)
+        .eq('logigramme_id', id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error(`[logigramme] Error updating unité ${unit.id}:`, error.message);
+      } else {
+        results.push(data);
+      }
+    }
+
+    console.log(`[logigramme] Updated ${results.length}/${unites.length} unités for logigramme ${id}`);
+    res.json({ success: true, updated: results.length });
+  } catch (err) {
+    console.error('[logigramme] Update unités error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -444,6 +453,8 @@ router.post('/import', upload.single('file'), async (req, res) => {
       throw new Error(`Année académique introuvable : ${yearError?.message || 'inconnue'}`);
     }
 
+    const canonicalWeekDateMap = await getYearWeekDateMap(academic_year_id);
+
     // 3. Process each sheet (excluding Feuil1)
     for (const sheetName of sheets) {
       if (sheetName === 'Feuil1') continue;
@@ -460,12 +471,22 @@ router.post('/import', upload.single('file'), async (req, res) => {
         continue;
       }
 
+      // Log Python parser diagnostics (goes to stderr)
+      const pyStderr = dataResult.stderr?.toString().trim();
+      if (pyStderr) {
+        console.log(`[import] Python parser diagnostics for '${sheetName}':\n${pyStderr}`);
+      }
+
       const data = JSON.parse(dataResult.stdout.toString());
       const { metadata, unites, weeks } = data;
 
       if (!metadata.filiere || !metadata.classe) {
-        console.warn(`Skipping sheet ${sheetName} due to missing filiere or classe metadata`);
+        console.warn(`[import] Skipping sheet '${sheetName}': missing filiere='${metadata.filiere}' or classe='${metadata.classe}'`);
         continue;
+      }
+
+      if (unites.length === 0) {
+        console.warn(`[import] ⚠ Sheet '${sheetName}' parsed with 0 unités — check Excel structure`);
       }
 
       // a. Upsert Filière
@@ -529,7 +550,7 @@ router.post('/import', upload.single('file'), async (req, res) => {
       const logigrammeId = logData.id;
 
       // d. Insert year_weeks (once per year/week)
-      const weekDateMap = {};
+      const weekDateMap = { ...canonicalWeekDateMap };
       for (let i = 0; i < weeks.length; i++) {
         const weekDate = weeks[i];
         if (!weekDate) continue;
@@ -552,6 +573,7 @@ router.post('/import', upload.single('file'), async (req, res) => {
         
         if (ywError) throw ywError;
         weekDateMap[i + 1] = weekDate;
+        canonicalWeekDateMap[i + 1] = weekDate;
       }
 
       // e. Process Unités and Cells
@@ -607,6 +629,10 @@ router.post('/import', upload.single('file'), async (req, res) => {
             cell_type: c.type,
             heures: c.value
           })).filter(c => c.week_start_date); // Safety check
+
+          if (cellInserts.length < unit.cells.length) {
+            console.warn(`[import] ⚠ Unit '${unit.nom}' in sheet '${sheetName}': ${unit.cells.length - cellInserts.length}/${unit.cells.length} cells dropped (missing week_start_date)`);
+          }
 
           if (cellInserts.length > 0) {
             const { error: cellError } = await supabaseAdmin

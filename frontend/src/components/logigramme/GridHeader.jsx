@@ -2,31 +2,32 @@ import { groupWeeksByMonth, formatShortDate } from '@/lib/logigramme-helpers';
 
 export function GridHeader({ weeks, onMarkWeek }) {
   const monthGroups = groupWeeksByMonth(weeks);
+  const weekColumnWidth = 40;
 
   return (
     <div className="flex flex-col sticky top-0 z-30 shadow-md">
       {/* 1. Semesters and Months */}
       <div className="flex w-fit bg-slate-100 border-b border-slate-300">
-         <div className="sticky left-0 z-40 w-[520px] bg-slate-100 border-r flex items-center justify-center text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+         <div className="w-[520px] bg-slate-100 border-r flex items-center justify-center text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
            Plan de formation
          </div>
          <div className="flex">
            {monthGroups.map((group, idx) => (
              <div
                key={idx}
-               style={{ width: `${group.span * 40}px` }}
+               style={{ width: `${group.count * weekColumnWidth}px` }}
                className="h-10 border-r border-slate-300 flex items-center justify-center text-[10px] font-black uppercase bg-slate-50 text-slate-700"
              >
                {group.mois}
              </div>
            ))}
          </div>
-         <div className="sticky right-0 z-40 w-24 bg-slate-100 border-l border-slate-300 flex items-center justify-center text-[10px] font-black text-slate-500 uppercase">Progression</div>
+         <div className="w-24 bg-slate-100 border-l border-slate-300 flex items-center justify-center text-[10px] font-black text-slate-500 uppercase">Progression</div>
       </div>
 
       {/* 2. Week Numbers */}
       <div className="flex w-fit bg-card border-b">
-         <div className="sticky left-0 z-40 flex bg-card border-r">
+         <div className="flex bg-card border-r">
             <div className="w-10 h-8 flex items-center justify-center text-[9px] font-black text-muted-foreground">N°</div>
             <div className="w-64 h-8 flex items-center px-3 text-[9px] font-black text-muted-foreground uppercase">Unité de formation</div>
             <div className="w-40 h-8 flex items-center px-3 text-[9px] font-black text-muted-foreground uppercase">Formateur</div>
@@ -44,12 +45,12 @@ export function GridHeader({ weeks, onMarkWeek }) {
              </div>
            ))}
          </div>
-         <div className="sticky right-0 z-40 w-24 bg-card border-l h-8" />
+         <div className="w-24 bg-card border-l h-8" />
       </div>
 
       {/* 3. Dates */}
       <div className="flex w-fit bg-muted/50 border-b">
-         <div className="sticky left-0 z-40 w-[520px] bg-muted/30 border-r h-6" />
+         <div className="w-[520px] bg-muted/30 border-r h-6" />
          <div className="flex">
            {weeks.map((w, idx) => (
              <div
@@ -60,7 +61,7 @@ export function GridHeader({ weeks, onMarkWeek }) {
              </div>
            ))}
          </div>
-         <div className="sticky right-0 z-40 w-24 bg-muted/30 border-l h-6" />
+         <div className="w-24 bg-muted/30 border-l h-6" />
       </div>
     </div>
   );

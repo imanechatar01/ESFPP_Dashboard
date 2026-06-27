@@ -1,25 +1,64 @@
+function parseLocalDate(dateStr) {
+  if (!dateStr) return null;
+
+  const [year, month, day] = dateStr.split('-').map(Number);
+  if (!year || !month || !day) return null;
+
+  return new Date(year, month - 1, day);
+}
+
+function formatMonthName(date) {
+  const month = date.toLocaleString('fr-FR', { month: 'long' });
+  return month.charAt(0).toUpperCase() + month.slice(1);
+}
+
+function getDominantWeekMonth(week) {
+  const startDate = parseLocalDate(week.week_start_date);
+  if (!startDate) return week.mois;
+
+  const dayCountsByMonth = new Map();
+
+  for (let offset = 0; offset < 7; offset++) {
+    const date = new Date(startDate);
+    date.setDate(startDate.getDate() + offset);
+
+    const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
+    const count = dayCountsByMonth.get(monthKey) || { date, count: 0 };
+    count.count += 1;
+    dayCountsByMonth.set(monthKey, count);
+  }
+
+  const dominantMonth = [...dayCountsByMonth.values()]
+    .sort((a, b) => b.count - a.count)[0];
+
+  return formatMonthName(dominantMonth.date);
+}
+
 /**
- * Group 52 weeks into 12 months for the grid header
- * @param {Array} weeks - Array of 52 week objects { semaine, week_start_date, mois, semestre }
- * @returns {Array} - Array of { mois, span, semestre }
+ * Group weeks into contiguous month blocks for the grid header.
+ * A week that overlaps two months is assigned to the month containing most of its days.
+ * @param {Array} weeks - Array of week objects { semaine, week_start_date, mois, semestre }
+ * @returns {Array} - Array of { mois, count, span }
  */
 export function groupWeeksByMonth(weeks) {
   if (!weeks || weeks.length === 0) return [];
   
   const groups = [];
-  let currentMonth = weeks[0].mois;
+  let currentMonth = getDominantWeekMonth(weeks[0]);
   let currentCount = 0;
 
   for (const w of weeks) {
-    if (w.mois === currentMonth) {
+    const month = getDominantWeekMonth(w);
+
+    if (month === currentMonth) {
       currentCount++;
     } else {
-      groups.push({ mois: currentMonth, count: currentCount });
-      currentMonth = w.mois;
+      groups.push({ mois: currentMonth, count: currentCount, span: currentCount });
+      currentMonth = month;
       currentCount = 1;
     }
   }
-  groups.push({ mois: currentMonth, count: currentCount });
+  groups.push({ mois: currentMonth, count: currentCount, span: currentCount });
   return groups;
 }
 
