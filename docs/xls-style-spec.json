@@ -1,0 +1,507 @@
+{
+  "columns": {
+    "0": {
+      "raw": 1389,
+      "px": 41
+    },
+    "1": {
+      "raw": 16493,
+      "px": 483
+    },
+    "2": {
+      "raw": 5449,
+      "px": 160
+    },
+    "3": {
+      "raw": 1572,
+      "px": 46
+    },
+    "4": {
+      "raw": 731,
+      "px": 21
+    },
+    "5": {
+      "raw": 694,
+      "px": 20
+    },
+    "6": {
+      "raw": 694,
+      "px": 20
+    },
+    "7": {
+      "raw": 694,
+      "px": 20
+    },
+    "8": {
+      "raw": 694,
+      "px": 20
+    },
+    "9": {
+      "raw": 1572,
+      "px": 46
+    },
+    "10": {
+      "raw": 694,
+      "px": 20
+    },
+    "11": {
+      "raw": 987,
+      "px": 29
+    },
+    "12": {
+      "raw": 694,
+      "px": 20
+    },
+    "13": {
+      "raw": 694,
+      "px": 20
+    },
+    "14": {
+      "raw": 841,
+      "px": 25
+    },
+    "15": {
+      "raw": 694,
+      "px": 20
+    },
+    "16": {
+      "raw": 694,
+      "px": 20
+    },
+    "17": {
+      "raw": 987,
+      "px": 29
+    },
+    "18": {
+      "raw": 694,
+      "px": 20
+    },
+    "19": {
+      "raw": 1133,
+      "px": 33
+    },
+    "20": {
+      "raw": 694,
+      "px": 20
+    },
+    "21": {
+      "raw": 694,
+      "px": 20
+    },
+    "22": {
+      "raw": 694,
+      "px": 20
+    },
+    "23": {
+      "raw": 694,
+      "px": 20
+    },
+    "24": {
+      "raw": 694,
+      "px": 20
+    },
+    "25": {
+      "raw": 914,
+      "px": 27
+    },
+    "26": {
+      "raw": 694,
+      "px": 20
+    },
+    "27": {
+      "raw": 694,
+      "px": 20
+    },
+    "28": {
+      "raw": 1280,
+      "px": 38
+    },
+    "29": {
+      "raw": 694,
+      "px": 20
+    },
+    "30": {
+      "raw": 694,
+      "px": 20
+    },
+    "31": {
+      "raw": 694,
+      "px": 20
+    },
+    "32": {
+      "raw": 694,
+      "px": 20
+    },
+    "33": {
+      "raw": 694,
+      "px": 20
+    },
+    "34": {
+      "raw": 694,
+      "px": 20
+    },
+    "35": {
+      "raw": 694,
+      "px": 20
+    },
+    "36": {
+      "raw": 694,
+      "px": 20
+    },
+    "37": {
+      "raw": 731,
+      "px": 21
+    },
+    "38": {
+      "raw": 1097,
+      "px": 32
+    },
+    "39": {
+      "raw": 694,
+      "px": 20
+    },
+    "40": {
+      "raw": 694,
+      "px": 20
+    },
+    "41": {
+      "raw": 694,
+      "px": 20
+    },
+    "42": {
+      "raw": 694,
+      "px": 20
+    },
+    "43": {
+      "raw": 694,
+      "px": 20
+    },
+    "44": {
+      "raw": 694,
+      "px": 20
+    },
+    "45": {
+      "raw": 694,
+      "px": 20
+    },
+    "46": {
+      "raw": 804,
+      "px": 24
+    },
+    "47": {
+      "raw": 658,
+      "px": 19
+    },
+    "48": {
+      "raw": 694,
+      "px": 20
+    },
+    "49": {
+      "raw": 1389,
+      "px": 41
+    },
+    "50": {
+      "raw": 1792,
+      "px": 52
+    },
+    "51": {
+      "raw": 694,
+      "px": 20
+    },
+    "52": {
+      "raw": 694,
+      "px": 20
+    },
+    "53": {
+      "raw": 694,
+      "px": 20
+    },
+    "54": {
+      "raw": 694,
+      "px": 20
+    },
+    "55": {
+      "raw": 694,
+      "px": 20
+    },
+    "56": {
+      "raw": 1280,
+      "px": 38
+    }
+  },
+  "rows": {
+    "0": {
+      "raw": 255,
+      "px": 13
+    },
+    "1": {
+      "raw": 270,
+      "px": 14
+    },
+    "2": {
+      "raw": 510,
+      "px": 26
+    },
+    "3": {
+      "raw": 375,
+      "px": 19
+    },
+    "4": {
+      "raw": 330,
+      "px": 16
+    },
+    "5": {
+      "raw": 510,
+      "px": 26
+    },
+    "6": {
+      "raw": 390,
+      "px": 20
+    },
+    "7": {
+      "raw": 510,
+      "px": 26
+    },
+    "8": {
+      "raw": 405,
+      "px": 20
+    },
+    "9": {
+      "raw": 420,
+      "px": 21
+    },
+    "10": {
+      "raw": 1155,
+      "px": 58
+    },
+    "11": {
+      "raw": 495,
+      "px": 25
+    }
+  },
+  "fonts": {
+    "header_semester": {
+      "name": "Arial Black",
+      "size": 20.0,
+      "bold": true,
+      "italic": false,
+      "color": "#000000"
+    },
+    "header_month": {
+      "name": "Calibri",
+      "size": 11.0,
+      "bold": true,
+      "italic": false,
+      "color": "#000000"
+    },
+    "header_week_num": {
+      "name": "Calibri",
+      "size": 10.0,
+      "bold": false,
+      "italic": false,
+      "color": "#000000"
+    },
+    "header_date": {
+      "name": "Calibri",
+      "size": 9.0,
+      "bold": true,
+      "italic": false,
+      "color": null
+    },
+    "unit_num": {
+      "name": "Arial Black",
+      "size": 9.0,
+      "bold": false,
+      "italic": false,
+      "color": "#000000"
+    },
+    "unit_name": {
+      "name": "Arial Black",
+      "size": 9.0,
+      "bold": false,
+      "italic": false,
+      "color": "#000000"
+    },
+    "formateur": {
+      "name": "Arial Black",
+      "size": 9.0,
+      "bold": false,
+      "italic": false,
+      "color": "#003366"
+    },
+    "vhg": {
+      "name": "Arial Black",
+      "size": 8.0,
+      "bold": true,
+      "italic": false,
+      "color": "#000000"
+    },
+    "cell_normal": {
+      "name": "Arial Black",
+      "size": 9.0,
+      "bold": true,
+      "italic": false,
+      "color": "#000000"
+    },
+    "cell_vacation": {
+      "name": "Arial Black",
+      "size": 10.0,
+      "bold": true,
+      "italic": false,
+      "color": null
+    },
+    "cell_exam": {
+      "name": "Arial Black",
+      "size": 18.0,
+      "bold": true,
+      "italic": false,
+      "color": "#ff0000"
+    },
+    "cell_tiff": {
+      "name": "Arial Black",
+      "size": 9.0,
+      "bold": true,
+      "italic": false,
+      "color": "#000000"
+    }
+  },
+  "colors": {
+    "backgrounds": {
+      "header_semester": "#ffff00",
+      "header_month": "#ffffff",
+      "header_week_num": "#ffffff",
+      "header_date": "#ffffff",
+      "unit_num": "#ffffff",
+      "unit_name": "#ffffcc",
+      "formateur": "#ffffcc",
+      "vhg": "#ffff00",
+      "cell_normal": "#ffffcc",
+      "cell_vacation": "#ff99cc",
+      "cell_exam": "#c0c0c0",
+      "cell_tiff": "#ffff00"
+    },
+    "text": {}
+  },
+  "borders": {
+    "header_semester": {
+      "bottom": {
+        "width": 2,
+        "color": null
+      },
+      "left": {
+        "width": 0,
+        "color": "#000000"
+      }
+    },
+    "header_month": {
+      "bottom": {
+        "width": 1,
+        "color": null
+      },
+      "left": {
+        "width": 1,
+        "color": null
+      }
+    },
+    "header_week_num": {
+      "bottom": {
+        "width": 1,
+        "color": null
+      },
+      "left": {
+        "width": 1,
+        "color": null
+      }
+    },
+    "header_date": {
+      "bottom": {
+        "width": 1,
+        "color": null
+      },
+      "left": {
+        "width": 1,
+        "color": null
+      }
+    },
+    "unit_num": {
+      "bottom": {
+        "width": 1,
+        "color": null
+      },
+      "left": {
+        "width": 1,
+        "color": null
+      }
+    },
+    "unit_name": {
+      "bottom": {
+        "width": 1,
+        "color": null
+      },
+      "left": {
+        "width": 1,
+        "color": null
+      }
+    },
+    "formateur": {
+      "bottom": {
+        "width": 1,
+        "color": null
+      },
+      "left": {
+        "width": 1,
+        "color": null
+      }
+    },
+    "vhg": {
+      "bottom": {
+        "width": 1,
+        "color": null
+      },
+      "left": {
+        "width": 1,
+        "color": null
+      }
+    },
+    "cell_normal": {
+      "bottom": {
+        "width": 1,
+        "color": null
+      },
+      "left": {
+        "width": 1,
+        "color": null
+      }
+    },
+    "cell_vacation": {
+      "bottom": {
+        "width": 1,
+        "color": null
+      },
+      "left": {
+        "width": 1,
+        "color": null
+      }
+    },
+    "cell_exam": {
+      "bottom": {
+        "width": 1,
+        "color": null
+      },
+      "left": {
+        "width": 1,
+        "color": null
+      }
+    },
+    "cell_tiff": {
+      "bottom": {
+        "width": 1,
+        "color": null
+      },
+      "left": {
+        "width": 1,
+        "color": null
+      }
+    }
+  }
+}

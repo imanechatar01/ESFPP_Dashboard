@@ -18,15 +18,15 @@ export function GridRow({ unite, weeksCount = 52, onToggleCell, highlightWeeks =
   return (
     <div className="flex w-fit hover:bg-muted/30 transition-colors group">
       {/* Sticky Left Panel */}
-      <div className="flex bg-card border-b group-hover:bg-muted/50 transition-colors">
-        <div className="w-10 h-10 border-r flex items-center justify-center text-[10px] font-bold text-muted-foreground">{ordre}</div>
-        <div className="w-64 h-10 border-r flex items-center px-3 text-[11px] font-bold truncate" title={nom}>{nom}</div>
-        <div className="w-40 h-10 border-r flex items-center px-3 text-[10px] font-medium text-muted-foreground truncate" title={formateur?.nom}>{formateur?.nom || '—'}</div>
-        <div className="w-16 h-10 border-r flex items-center justify-center text-[11px] font-black">{vhg}</div>
+      <div className="flex border-b border-slate-300 group-hover:bg-muted/50 transition-colors shrink-0 font-['Arial_Black'] text-black">
+        <div className="w-[41px] h-10 border-r border-slate-300 flex items-center justify-center text-[12px] font-bold bg-white">{ordre}</div>
+        <div className="w-[483px] h-10 border-r border-slate-300 flex items-center px-3 text-[12px] font-bold truncate bg-logigramme-unit-name" title={nom}>{nom}</div>
+        <div className="w-[160px] h-10 border-r border-slate-300 flex items-center px-3 text-[12px] font-bold text-[#003366] truncate bg-logigramme-formateur" title={formateur?.nom}>{formateur?.nom || '—'}</div>
+        <div className="w-[46px] h-10 border-r border-slate-400 flex items-center justify-center text-[11px] font-bold bg-logigramme-vhg">{vhg}</div>
       </div>
 
       {/* 52 Week Cells */}
-      <div className="flex">
+      <div className="flex shrink-0">
         {cellsArray.map((cell, idx) => (
           <GridCell
             key={idx}
@@ -38,7 +38,7 @@ export function GridRow({ unite, weeksCount = 52, onToggleCell, highlightWeeks =
       </div>
 
       {/* Sticky Right Panel - Progress */}
-      <div className="w-24 h-10 bg-card border-b border-l flex items-center px-2 group-hover:bg-muted/50 transition-colors">
+      <div className="w-24 h-10 bg-white border-b border-l border-slate-300 flex items-center px-2 group-hover:bg-muted/50 transition-colors shrink-0">
         <div className="w-full">
            <div className="flex justify-between text-[9px] font-black mb-0.5">
              <span>{Math.round(vh_realise)}h</span>

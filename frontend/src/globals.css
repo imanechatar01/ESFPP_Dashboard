@@ -19,6 +19,16 @@
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
   
+  --color-logigramme-normal: #FFFFCC;
+  --color-logigramme-vacation: #FF99CC;
+  --color-logigramme-exam: #C0C0C0;
+  --color-logigramme-tiff: #FFFF00;
+  --color-logigramme-header-semester: #FFFF00;
+  --color-logigramme-header-month: #FFFFFF;
+  --color-logigramme-unit-name: #FFFFCC;
+  --color-logigramme-formateur: #FFFFCC;
+  --color-logigramme-vhg: #FFFF00;
+
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);

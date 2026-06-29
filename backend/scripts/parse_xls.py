@@ -118,33 +118,38 @@ def parse_xls(file_path, sheet_name):
             val = cell.value
             
             # Map colors to types
-            # (255, 255, 204) - Light Yellow (Normal)
-            # (255, 255, 0)   - Bright Yellow (TIFF or Normal with value)
-            # (255, 153, 204) - Pink (Vacation)
-            # (192, 192, 192) - Gray (Exam)
-            
-            if rgb == (255, 255, 204):
+            is_global = False
+            if isinstance(val, (int, float)) and val > 0:
+                cell_type = "normal"
+            elif rgb == (255, 255, 204):
                 cell_type = "normal"
             elif rgb == (255, 255, 0):
                 if isinstance(val, (int, float)) and val > 0:
-                    cell_type = "normal" # Last session marker
+                    cell_type = "normal"
                 else:
                     cell_type = "tiff"
             elif rgb == (255, 153, 204):
                 cell_type = "vacation"
+                if "vacance" in str(val).lower():
+                    is_global = True
             elif rgb == (192, 192, 192):
                 cell_type = "exam"
-            elif isinstance(val, (int, float)) and val > 0:
-                cell_type = "normal"
-            elif str(val).lower().strip() == "vacance":
+                if "examen" in str(val).lower():
+                    is_global = True
+            elif "vacance" in str(val).lower():
                 cell_type = "vacation"
+                is_global = True
+            elif "examen" in str(val).lower():
+                cell_type = "exam"
+                is_global = True
             
             if cell_type != "empty" or (isinstance(val, (int, float)) and val > 0):
                 cells.append({
                     "week": col_idx - 3,
                     "type": cell_type,
                     "value": val if isinstance(val, (int, float)) else None,
-                    "date": week_dates[col_idx - 4]
+                    "date": week_dates[col_idx - 4],
+                    "is_global": is_global
                 })
 
         unites.append({
@@ -156,7 +161,36 @@ def parse_xls(file_path, sheet_name):
             "cells": cells
         })
 
+<<<<<<< HEAD
     print(f"[parse_xls] Sheet '{sheet_name}': parsed {len(unites)} unité(s), {sum(len(u['cells']) for u in unites)} total cells", file=sys.stderr)
+=======
+    # BUG FIX 3: Broadcast 'exam' and 'vacation' cell_type to all units for weeks that are global
+    # Identify which weeks have 'exam' or 'vacation' with the is_global flag
+    global_weeks = {} # week -> type
+    for u in unites:
+        for c in u["cells"]:
+            if c.get("is_global"):
+                global_weeks[c["week"]] = c["type"]
+    
+    # Second pass: Ensure all units have the global type for those weeks, but DON'T overwrite values
+    for u in unites:
+        existing_weeks = {c["week"]: c for c in u["cells"]}
+        for w, gtype in global_weeks.items():
+            if w in existing_weeks:
+                # Only overwrite if it doesn't have a numerical value or it's an evaluation of the same type
+                if not existing_weeks[w]["value"]:
+                    existing_weeks[w]["type"] = gtype
+            else:
+                # Add a new global cell if it didn't exist
+                u["cells"].append({
+                    "week": w,
+                    "type": gtype,
+                    "value": None,
+                    "date": week_dates[w-1] if w <= len(week_dates) else None
+                })
+        # Sort cells by week
+        u["cells"].sort(key=lambda x: x["week"])
+>>>>>>> db1b912 (Refactor logigramme grid: extract XLS styles, fix global week broadcasts, and synchronize visual design)
 
     # Metadata extraction (Search first 10 rows)
     # Uses normalize_label (accent-safe) for all checks

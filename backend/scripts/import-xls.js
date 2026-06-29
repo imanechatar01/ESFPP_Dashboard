@@ -161,6 +161,21 @@ async function run() {
       }
       const logigrammeId = logData.id;
 
+      // DELETE existing cells for this logigramme before re-importing
+      // First find all units for this logigramme
+      const { data: existingUnits } = await supabase
+        .from('unites_formation')
+        .select('id')
+        .eq('logigramme_id', logigrammeId);
+      
+      if (existingUnits && existingUnits.length > 0) {
+        const unitIds = existingUnits.map(u => u.id);
+        await supabase
+          .from('week_cells')
+          .delete()
+          .in('unite_id', unitIds);
+      }
+
       // d. Insert year_weeks (once per year)
       // This is slightly redundant but safe with UNIQUE constraint
       for (let i = 0; i < weeks.length; i++) {

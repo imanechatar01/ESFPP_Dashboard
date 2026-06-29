@@ -112,17 +112,17 @@ export function computeProgress(vhg, cells) {
  * Map cell types to CSS classes
  */
 export function getCellClassName(type, status) {
-  const base = "w-10 h-10 border-r border-b text-[10px] font-bold flex items-center justify-center transition-all cursor-pointer select-none";
+  const base = "w-10 h-10 border-r border-b text-[10px] font-bold flex items-center justify-center transition-all cursor-pointer select-none font-['Arial_Black']";
   
-  if (type === 'vacation') return `${base} bg-pink-100 text-pink-700 border-pink-200 cursor-default`;
-  if (type === 'exam') return `${base} bg-slate-200 text-slate-700 border-slate-300 cursor-default`;
-  if (type === 'tiff') return `${base} bg-yellow-400 text-yellow-900 border-yellow-500 cursor-default`;
+  if (type === 'vacation') return `${base} bg-logigramme-vacation text-slate-700 border-slate-300 cursor-default`;
+  if (type === 'exam') return `${base} bg-logigramme-exam text-red-600 text-[18px] border-slate-300 cursor-default`;
+  if (type === 'tiff') return `${base} bg-logigramme-tiff text-slate-900 border-slate-400 cursor-default`;
   
   if (type === 'normal') {
     if (status === 'done' || status === 'auto_done') {
       return `${base} bg-emerald-500 text-white border-emerald-600 hover:bg-emerald-600`;
     }
-    return `${base} bg-yellow-50 text-yellow-800 border-yellow-100 hover:bg-yellow-100`;
+    return `${base} bg-logigramme-normal text-slate-800 border-slate-300 hover:bg-yellow-100`;
   }
   
   return `${base} bg-white text-transparent border-slate-100`;
