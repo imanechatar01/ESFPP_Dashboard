@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react"
-import { Activity, Check, ClipboardCopy, ExternalLink, Loader2, Link2, MailPlus, RefreshCw, Users, X, UserPlus, Shield, User, CalendarDays } from "lucide-react"
+import { Activity, Check, Loader2, Mail, MailPlus, RefreshCw, Users, UserPlus, Shield, User, CalendarDays } from "lucide-react"
 import { DashboardShell } from "@/components/layout/dashboard-shell"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -29,77 +29,7 @@ function StatusBadge({ status }) {
   )
 }
 
-function CopyButton({ text, label = "Copier" }) {
-  const [copied, setCopied] = useState(false)
-
-  async function handleCopy() {
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      const textarea = document.createElement("textarea")
-      textarea.value = text
-      document.body.appendChild(textarea)
-      textarea.select()
-      document.execCommand("copy")
-      document.body.removeChild(textarea)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    }
-  }
-
-  return (
-    <Button type="button" variant="outline" size="xs" onClick={handleCopy} className={cn("h-7", copied && "border-emerald-500 bg-emerald-50 text-emerald-600")}>
-      {copied ? <Check className="size-3 mr-1" /> : <ClipboardCopy className="size-3 mr-1" />}
-      {copied ? "Copié" : label}
-    </Button>
-  )
-}
-
-function InviteLinkDisplay({ inviteLink, onClose }) {
-  if (!inviteLink) return null
-
-  return (
-    <div className="mt-6 rounded-2xl border border-primary/20 bg-primary/[0.03] p-5 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-primary/10">
-            <Link2 className="size-4 text-primary" />
-          </div>
-          <p className="text-sm font-bold text-foreground">Lien d'invitation généré</p>
-        </div>
-        {onClose && (
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          >
-            <X className="size-4" />
-          </button>
-        )}
-      </div>
-
-      <div className="rounded-xl border border-input bg-background/50 px-4 py-3 shadow-inner">
-        <p className="break-all text-[11px] font-mono text-muted-foreground leading-relaxed select-all">{inviteLink}</p>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <CopyButton text={inviteLink} label="Copier le lien" />
-        <Button
-          type="button"
-          variant="outline"
-          size="xs"
-          className="h-7"
-          onClick={() => window.open(inviteLink, "_blank")}
-        >
-          <ExternalLink className="size-3 mr-1" />
-          Ouvrir
-        </Button>
-      </div>
-    </div>
-  )
-}
+// CopyButton and InviteLinkDisplay components removed as invitations are sent automatically by email
 
 export function AccountManagement({ path, navigate }) {
   const [users, setUsers] = useState([])
@@ -107,7 +37,6 @@ export function AccountManagement({ path, navigate }) {
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState("")
   const [error, setError] = useState("")
-  const [inviteLink, setInviteLink] = useState("")
   const [regenerating, setRegenerating] = useState(null)
   const [rowInviteLinks, setRowInviteLinks] = useState({})
   const formRef = useRef(null)
@@ -134,20 +63,18 @@ export function AccountManagement({ path, navigate }) {
     setSubmitting(true)
     setMessage("")
     setError("")
-    setInviteLink("")
 
     const formData = new FormData(e.currentTarget)
     const email = String(formData.get("email") || "").trim()
     const role = String(formData.get("role") || "student")
 
     try {
-      const result = await apiRequest("/api/admin/invitations", {
+      await apiRequest("/api/admin/invitations", {
         method: "POST",
         body: JSON.stringify({ email, role }),
       })
       formRef.current?.reset()
-      setInviteLink(result.inviteLink || "")
-      setMessage(`Invitation créée pour ${email}.`)
+      setMessage(`Invitation envoyée par email à ${email}.`)
       await loadUsers()
     } catch (err) {
       setError(err.message)
@@ -161,10 +88,13 @@ export function AccountManagement({ path, navigate }) {
     setRowInviteLinks((prev) => ({ ...prev, [userId]: undefined }))
 
     try {
-      const result = await apiRequest(`/api/admin/invitations/${userId}/regenerate`, {
+      await apiRequest(`/api/admin/invitations/${userId}/regenerate`, {
         method: "POST",
       })
-      setRowInviteLinks((prev) => ({ ...prev, [userId]: result.inviteLink }))
+      setRowInviteLinks((prev) => ({ ...prev, [userId]: 'sent' }))
+      setTimeout(() => {
+        setRowInviteLinks((prev) => ({ ...prev, [userId]: undefined }))
+      }, 4000)
     } catch (err) {
       setRowInviteLinks((prev) => ({ ...prev, [userId]: null }))
       setError(err.message)
@@ -183,7 +113,7 @@ export function AccountManagement({ path, navigate }) {
     >
       <div className="grid gap-8 lg:grid-cols-[400px_1fr]">
         {/* Create invitation */}
-        <section className="rounded-2xl border border-border bg-card p-6 shadow-sm medical-glass h-fit sticky top-28">
+        <section className="rounded-2xl border border-border bg-card p-6 shadow-sm medical-glass h-fit lg:sticky lg:top-28">
           <div className="flex items-center gap-3 mb-6">
             <div className="p-2 rounded-lg bg-primary/10">
               <UserPlus className="size-5 text-primary" />
@@ -228,7 +158,7 @@ export function AccountManagement({ path, navigate }) {
             </Button>
           </form>
 
-          {(message || error) && !inviteLink && (
+          {(message || error) && (
             <div className={cn(
               "mt-6 p-4 rounded-xl text-xs font-bold border animate-in fade-in zoom-in-95 duration-200",
               error ? "bg-rose-50 border-rose-100 text-rose-600" : "bg-primary/5 border-primary/10 text-primary"
@@ -236,18 +166,10 @@ export function AccountManagement({ path, navigate }) {
               {error || message}
             </div>
           )}
-
-          <InviteLinkDisplay
-            inviteLink={inviteLink}
-            onClose={() => {
-              setInviteLink("")
-              setMessage("")
-            }}
-          />
         </section>
 
         {/* Users table */}
-        <section className="rounded-2xl border border-border bg-card p-6 shadow-sm medical-glass">
+        <section className="min-w-0 rounded-2xl border border-border bg-card p-6 shadow-sm medical-glass">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-accent/10">
@@ -271,8 +193,91 @@ export function AccountManagement({ path, navigate }) {
             </Button>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-border/50 bg-background/30 backdrop-blur-sm">
-            <table className="w-full text-left">
+          <div className="overflow-x-auto custom-scrollbar rounded-2xl border border-border/50 bg-background/30 backdrop-blur-sm">
+            {/* Mobile Card View */}
+            <div className="block md:hidden divide-y divide-border/50">
+              {loadingUsers ? (
+                <div className="px-6 py-12 text-center">
+                  <Loader2 className="size-8 animate-spin mx-auto text-primary/20" />
+                  <p className="mt-2 text-sm font-bold text-muted-foreground/50">Synchronisation des données...</p>
+                </div>
+              ) : users.length === 0 ? (
+                <div className="px-6 py-12 text-center">
+                  <Users className="size-8 mx-auto text-muted-foreground/20" />
+                  <p className="mt-2 text-sm font-bold text-muted-foreground/50">Aucun compte trouvé</p>
+                </div>
+              ) : (
+                users.map((user) => (
+                  <div key={user.id} className="p-4 space-y-3 transition-colors hover:bg-muted/10">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className="size-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground/60 border border-border/50 shrink-0">
+                          <User className="size-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-foreground truncate max-w-[180px]">{user.email}</p>
+                          {(user.firstName || user.lastName) && (
+                            <p className="text-xs text-muted-foreground font-semibold">
+                              {user.firstName} {user.lastName}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <StatusBadge status={user.status} />
+                    </div>
+
+                    <div className="flex items-center justify-between gap-4 pt-1">
+                      <div className="flex items-center gap-1">
+                        {user.role === 'admin' ? <Shield className="size-3.5 text-primary" /> : <User className="size-3.5 text-muted-foreground" />}
+                        <span className={cn("text-[10px] font-black uppercase tracking-wider", user.role === 'admin' ? "text-primary" : "text-muted-foreground")}>
+                          {user.role}
+                        </span>
+                      </div>
+
+                      <div>
+                        {user.status !== "active" && user.status !== "blocked" && (
+                          <div className="flex flex-col items-end gap-1.5">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="xs"
+                              className="rounded-lg h-8 font-bold text-[10px] uppercase tracking-wider hover:border-primary hover:text-primary transition-all"
+                              onClick={() => handleRegenerate(user.id)}
+                              disabled={regenerating === user.id}
+                            >
+                              {regenerating === user.id ? (
+                                <Loader2 className="size-3 animate-spin mr-1" />
+                              ) : (
+                                <Mail className="size-3 mr-1" />
+                              )}
+                              Renvoyer l'invitation
+                            </Button>
+
+                            {rowInviteLinks[user.id] === 'sent' && (
+                              <span className="text-[10px] font-bold text-emerald-600 animate-in fade-in duration-300">
+                                Invitation envoyée !
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {user.status === "active" && (
+                          <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-emerald-600/60">
+                            <Check className="size-3" />
+                            Finalisé
+                          </div>
+                        )}
+                        {user.status === "blocked" && (
+                          <span className="text-xs font-bold italic text-rose-500/60">Restreint</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Desktop Table View */}
+            <table className="hidden md:table w-full text-left">
               <thead>
                 <tr className="border-b border-border/50 bg-muted/30">
                   <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Utilisateur</th>
@@ -332,18 +337,15 @@ export function AccountManagement({ path, navigate }) {
                               {regenerating === user.id ? (
                                 <Loader2 className="size-3 animate-spin mr-1" />
                               ) : (
-                                <RefreshCw className="size-3 mr-1" />
+                                <Mail className="size-3 mr-1" />
                               )}
-                              Générer le lien
+                              Renvoyer l'invitation
                             </Button>
 
-                            {rowInviteLinks[user.id] && (
-                              <div className="rounded-xl border border-primary/20 bg-primary/[0.02] p-3 space-y-2 animate-in fade-in slide-in-from-right-2 duration-300">
-                                <p className="break-all text-[10px] font-mono text-muted-foreground select-all leading-tight">
-                                  {rowInviteLinks[user.id]}
-                                </p>
-                                <CopyButton text={rowInviteLinks[user.id]} label="Copier" />
-                              </div>
+                            {rowInviteLinks[user.id] === 'sent' && (
+                              <span className="text-[10px] font-bold text-emerald-600 animate-in fade-in duration-300">
+                                Invitation envoyée !
+                              </span>
                             )}
                           </div>
                         )}
@@ -364,7 +366,7 @@ export function AccountManagement({ path, navigate }) {
             </table>
           </div>
 
-          {error && !inviteLink && (
+          {error && (
             <div className="mt-6 p-4 rounded-xl bg-rose-50 border border-rose-100 text-xs font-bold text-rose-600">
               {error}
             </div>

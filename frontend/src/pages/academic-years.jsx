@@ -111,8 +111,60 @@ export default function AcademicYears({ path, navigate }) {
         </Button>
       </div>
 
-      <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
-        <table className="w-full text-left border-collapse">
+      <div className="rounded-2xl border border-border bg-card overflow-x-auto custom-scrollbar shadow-sm">
+        {/* Mobile Cards Layout */}
+        <div className="block md:hidden divide-y divide-border">
+          {loading ? (
+            <div className="p-6 text-center">
+              <Loader2 className="size-6 animate-spin text-primary/40 mx-auto" />
+            </div>
+          ) : years.length === 0 ? (
+            <div className="p-6 text-center text-sm font-bold text-muted-foreground/50 uppercase tracking-widest">
+              Aucune année configurée
+            </div>
+          ) : (
+            years.map((year) => (
+              <div key={year.id} className={cn("p-5 space-y-3 transition-colors", year.is_current && "bg-primary/[0.02]")}>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-black text-foreground">{year.label}</p>
+                  {year.is_current ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-black uppercase tracking-wider">
+                      <CheckCircle2 className="size-3" />
+                      Actuelle
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest">Archive</span>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 block">Début</span>
+                    <span className="font-bold text-muted-foreground">{formatDate(year.start_date)}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 block">Fin</span>
+                    <span className="font-bold text-muted-foreground">{formatDate(year.end_date)}</span>
+                  </div>
+                </div>
+                {!year.is_current && (
+                  <div className="pt-2 border-t border-border/50">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleSetCurrent(year.id)}
+                      className="w-full text-[10px] font-black uppercase tracking-widest text-primary hover:bg-primary/10 rounded-xl"
+                    >
+                      Définir comme actuelle
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Desktop Table Layout */}
+        <table className="hidden md:table w-full text-left border-collapse">
           <thead>
             <tr className="bg-muted/50 border-b border-border">
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Année</th>

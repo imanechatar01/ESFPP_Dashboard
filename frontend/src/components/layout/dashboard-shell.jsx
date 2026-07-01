@@ -281,8 +281,8 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
     </div>
     </header>
 
-    {/* Reduced padding for content area */}
-    <div className="w-full px-3 py-3 flex-1 overflow-y-auto">
+    {/* Content area with responsive padding for breathing room */}
+    <div className="w-full px-4 md:px-6 py-6 flex-1 overflow-y-auto overflow-x-hidden">
     {children}
     </div>
     </section>

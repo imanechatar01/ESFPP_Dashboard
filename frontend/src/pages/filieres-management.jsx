@@ -143,7 +143,7 @@ export default function FilieresManagement({ path, navigate }) {
         </Button>
       </div>
 
-      <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+      <div className="rounded-2xl border border-border bg-card overflow-x-auto custom-scrollbar shadow-sm">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-muted/50 border-b border-border">
