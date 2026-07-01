@@ -12,7 +12,7 @@ function formatMonthName(date) {
   return month.charAt(0).toUpperCase() + month.slice(1);
 }
 
-function getDominantWeekMonth(week) {
+export function getDominantWeekMonth(week) {
   const startDate = parseLocalDate(week.week_start_date);
   if (!startDate) return week.mois;
 
@@ -112,18 +112,25 @@ export function computeProgress(vhg, cells) {
  * Map cell types to CSS classes
  */
 export function getCellClassName(type, status) {
-  const base = "w-10 h-10 border-r border-b text-[10px] font-bold flex items-center justify-center transition-all cursor-pointer select-none";
+  const base = "relative w-10 h-12 border-r border-b border-slate-300 text-[11px] font-bold flex items-center justify-center transition-all cursor-pointer select-none";
   
-  if (type === 'vacation') return `${base} bg-pink-100 text-pink-700 border-pink-200 cursor-default`;
-  if (type === 'exam') return `${base} bg-slate-200 text-slate-700 border-slate-300 cursor-default`;
-  if (type === 'tiff') return `${base} bg-yellow-400 text-yellow-900 border-yellow-500 cursor-default`;
+  const isDone = status === 'done' || status === 'auto_done';
+  
+  if (type === 'vacation') return `${base} bg-[#F472B6] text-white border-slate-300 cursor-default font-extrabold text-[12px]`;
+  if (type === 'exam') {
+    if (isDone) {
+      return `${base} bg-[#BBF7D0] text-[#065F46] border-slate-300 hover:bg-[#A7F3D0]`;
+    }
+    return `${base} bg-slate-200 text-slate-700 border-slate-300`;
+  }
+  if (type === 'tiff') return `${base} bg-yellow-400 text-yellow-900 border-slate-300 cursor-default`;
   
   if (type === 'normal') {
-    if (status === 'done' || status === 'auto_done') {
-      return `${base} bg-emerald-500 text-white border-emerald-600 hover:bg-emerald-600`;
+    if (isDone) {
+      return `${base} bg-[#BBF7D0] text-slate-800 border-slate-300 hover:bg-[#A7F3D0]`;
     }
-    return `${base} bg-yellow-50 text-yellow-800 border-yellow-100 hover:bg-yellow-100`;
+    return `${base} bg-[#FEF9C3] text-slate-800 border-slate-300 hover:bg-[#FEF08A]`;
   }
   
-  return `${base} bg-white text-transparent border-slate-100`;
+  return `${base} bg-white text-transparent border-slate-300`;
 }

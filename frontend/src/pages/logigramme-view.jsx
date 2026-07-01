@@ -177,7 +177,7 @@ export function LogigrammeView({ path, navigate }) {
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className={cn(
-              "absolute top-0 z-20 flex items-center gap-1.5 h-8 px-2 rounded-lg border border-border bg-card/90 backdrop-blur-sm shadow-sm hover:bg-muted/50 transition-all group",
+              "absolute top-0 z-40 flex items-center gap-1.5 h-8 px-2 rounded-lg border border-border bg-card/90 backdrop-blur-sm shadow-sm hover:bg-muted/50 transition-all group",
               sidebarOpen ? "left-[236px]" : "left-0"
             )}
             title={sidebarOpen ? "Masquer la liste" : "Afficher la liste"}
