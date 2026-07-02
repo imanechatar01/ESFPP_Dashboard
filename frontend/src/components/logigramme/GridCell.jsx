@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 
 export function GridCell({ cell, onToggle, isHighlighted = false }) {
   if (!cell) {
-    return <div className="w-10 h-10 border-r border-b bg-white/30" />;
+    return <div className="w-10 h-12 border-r border-b border-slate-300 bg-white" />;
   }
 
   const { id, cell_type, heures, completion_status } = cell;
@@ -12,7 +12,7 @@ export function GridCell({ cell, onToggle, isHighlighted = false }) {
   const isNormal = cell_type === 'normal';
 
   const handleClick = () => {
-    if (isNormal && onToggle) {
+    if ((isNormal || cell_type === 'exam') && onToggle) {
       onToggle(id, completion_status);
     }
   };
@@ -27,10 +27,18 @@ export function GridCell({ cell, onToggle, isHighlighted = false }) {
       title={isHighlighted ? "CONFLIT D'HORAIRE ! " + (isNormal ? `${heures}h` : cell_type) : (isNormal ? `${heures}h - ${completion_status}` : cell_type)}
     >
       {cell_type === 'vacation' && 'V'}
-      {cell_type === 'exam' && 'E'}
+      {cell_type === 'exam' && (
+        <>
+          <span>E</span>
+          {isDone && <span className="absolute top-0.5 right-0.5 text-[8px] font-bold text-emerald-600">✔</span>}
+        </>
+      )}
       {cell_type === 'tiff' && 'T'}
       {isNormal && (
-        isDone ? <Check className="size-4" /> : Math.round(heures)
+        <>
+          <span>{Math.round(heures)}</span>
+          {isDone && <span className="absolute top-0.5 right-0.5 text-[8px] font-bold text-emerald-600">✔</span>}
+        </>
       )}
     </div>
   );

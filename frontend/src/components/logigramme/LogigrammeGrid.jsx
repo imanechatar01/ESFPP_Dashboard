@@ -30,10 +30,11 @@ export function LogigrammeGrid({ data, loading, onToggleCell, onMarkWeek }) {
             }}
           />
           <div className="flex flex-col">
-            {unites.map(unite => (
+            {unites.map((unite, index) => (
               <GridRow
                 key={unite.id}
                 unite={unite}
+                rowIndex={index + 1}
                 weeksCount={weeks.length}
                 onToggleCell={onToggleCell}
               />
