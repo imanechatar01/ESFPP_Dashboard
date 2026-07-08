@@ -154,9 +154,9 @@ export function AccountManagement({ path, navigate }) {
       activePath={path}
       navigate={navigate}
     >
-      <div className="grid gap-8 lg:grid-cols-[400px_1fr]">
+      <div className="grid gap-8 lg:grid-cols-[400px_1fr] h-[calc(100vh-100px)] min-h-0">
         {/* Create invitation */}
-        <section className="rounded-2xl border border-border bg-card p-6 shadow-sm medical-glass h-fit lg:sticky lg:top-28">
+        <section className="rounded-2xl border border-border bg-card p-6 shadow-sm medical-glass h-full overflow-y-auto flex flex-col justify-between shrink-0">
           <div className="flex items-center gap-3 mb-6">
             <div className="p-2 rounded-lg bg-primary/10">
               <UserPlus className="size-5 text-primary" />
@@ -212,7 +212,7 @@ export function AccountManagement({ path, navigate }) {
         </section>
 
         {/* Users table */}
-        <section className="min-w-0 rounded-2xl border border-border bg-card p-6 shadow-sm medical-glass">
+        <section className="min-w-0 rounded-2xl border border-border bg-card p-6 shadow-sm medical-glass h-full flex flex-col min-h-0">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-accent/10">
@@ -249,7 +249,7 @@ export function AccountManagement({ path, navigate }) {
             </div>
           </div>
 
-          <div className="overflow-x-auto custom-scrollbar rounded-2xl border border-border/50 bg-background/30 backdrop-blur-sm">
+          <div className="overflow-x-auto overflow-y-auto flex-1 custom-scrollbar rounded-2xl border border-border/50 bg-background/30 backdrop-blur-sm min-h-0">
             {/* Mobile Card View */}
             <div className="block md:hidden divide-y divide-border/50">
               {loadingUsers ? (
