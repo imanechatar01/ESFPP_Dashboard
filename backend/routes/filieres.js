@@ -1,5 +1,6 @@
 import express from 'express';
 import { supabaseAdmin } from '../lib/supabase.js';
+import { requireRole } from '../lib/auth.js';
 
 const router = express.Router();
 
@@ -19,7 +20,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/filieres
-router.post('/', async (req, res) => {
+router.post('/', requireRole('admin'), async (req, res) => {
   const { code, name, niveau, nb_annees } = req.body;
 
   try {
@@ -55,7 +56,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT /api/filieres/:id
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireRole('admin'), async (req, res) => {
   const { id } = req.params;
   const { name, niveau, code } = req.body;
   try {
@@ -74,7 +75,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE /api/filieres/:id
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireRole('admin'), async (req, res) => {
   const { id } = req.params;
   try {
     const { error } = await supabaseAdmin

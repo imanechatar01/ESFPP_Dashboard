@@ -1,11 +1,13 @@
 import { useEffect, useState, useRef } from "react"
-import { Activity, Check, Loader2, Mail, MailPlus, RefreshCw, Users, UserPlus, Shield, User, CalendarDays } from "lucide-react"
+import { Activity, Check, Loader2, Mail, MailPlus, RefreshCw, Users, UserPlus, Shield, User, CalendarDays, Trash2 } from "lucide-react"
 import { DashboardShell } from "@/components/layout/dashboard-shell"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { apiRequest } from "@/lib/api"
 import { cn } from "@/lib/utils"
+import Swal from "sweetalert2"
+import { useAuth } from "@/contexts/auth-context"
 
 const navItems = [
   { label: "Tableau de bord", path: "/admin/dashboard", icon: Activity },
@@ -32,6 +34,7 @@ function StatusBadge({ status }) {
 // CopyButton and InviteLinkDisplay components removed as invitations are sent automatically by email
 
 export function AccountManagement({ path, navigate }) {
+  const { user: currentUser } = useAuth()
   const [users, setUsers] = useState([])
   const [loadingUsers, setLoadingUsers] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -39,6 +42,8 @@ export function AccountManagement({ path, navigate }) {
   const [error, setError] = useState("")
   const [regenerating, setRegenerating] = useState(null)
   const [rowInviteLinks, setRowInviteLinks] = useState({})
+  const [filterRole, setFilterRole] = useState("")
+  const [deletingUser, setDeletingUser] = useState(null)
   const formRef = useRef(null)
 
   async function loadUsers() {
@@ -103,6 +108,44 @@ export function AccountManagement({ path, navigate }) {
     }
   }
 
+  async function handleDeleteUser(userId, userEmail) {
+    Swal.fire({
+      title: "Supprimer l'utilisateur ?",
+      text: `Le compte de ${userEmail} sera définitivement supprimé !`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Oui, supprimer !",
+      cancelButtonText: "Annuler"
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        setDeletingUser(userId)
+        try {
+          await apiRequest(`/api/admin/users/${userId}`, {
+            method: "DELETE"
+          })
+          setUsers(prev => prev.filter(u => u.id !== userId))
+          Swal.fire({
+            title: "Supprimé !",
+            text: "L'utilisateur a été supprimé avec succès.",
+            icon: "success",
+            timer: 2000,
+            showConfirmButton: false
+          })
+        } catch (err) {
+          Swal.fire("Erreur", err.message, "error")
+        } finally {
+          setDeletingUser(null)
+        }
+      }
+    })
+  }
+
+  const filteredUsers = users.filter(user => {
+    return !filterRole || user.role === filterRole
+  })
+
   return (
     <DashboardShell
       title="Gestion des comptes"
@@ -124,12 +167,12 @@ export function AccountManagement({ path, navigate }) {
           <form ref={formRef} onSubmit={handleCreateAccount} className="space-y-5">
             <div className="space-y-2">
               <Label htmlFor="invite-email" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Adresse Email</Label>
-              <Input 
-                id="invite-email" 
-                name="email" 
-                type="email" 
-                placeholder="nom.prenom@esfpp.ma" 
-                required 
+              <Input
+                id="invite-email"
+                name="email"
+                type="email"
+                placeholder="nom.prenom@esfpp.ma"
+                required
                 className="h-11 rounded-xl bg-background/50 border-border/50 focus:bg-background"
               />
             </div>
@@ -147,7 +190,7 @@ export function AccountManagement({ path, navigate }) {
                   <option value="admin">Administrateur (Accès complet)</option>
                 </select>
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground/50">
-                   <Activity className="size-4" />
+                  <Activity className="size-4" />
                 </div>
               </div>
             </div>
@@ -177,20 +220,33 @@ export function AccountManagement({ path, navigate }) {
               </div>
               <div>
                 <h2 className="text-lg font-bold tracking-tight">Annuaire des comptes</h2>
-                <p className="text-xs text-muted-foreground font-medium">{users.length} utilisateurs enregistrés</p>
+                <p className="text-xs text-muted-foreground font-medium">{filteredUsers.length} utilisateurs affichés</p>
               </div>
             </div>
-            <Button 
-              type="button" 
-              variant="outline" 
-              size="sm"
-              className="rounded-xl font-bold h-10 px-4 hover:bg-muted"
-              onClick={loadUsers} 
-              disabled={loadingUsers}
-            >
-              <RefreshCw className={cn("size-4 mr-2", loadingUsers && "animate-spin")} />
-              Actualiser
-            </Button>
+            
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <select
+                className="h-10 rounded-xl border border-border/50 bg-background/50 px-3 py-2 text-xs font-semibold outline-none focus-visible:border-primary transition-colors"
+                value={filterRole}
+                onChange={(e) => setFilterRole(e.target.value)}
+              >
+                <option value="">Tous les rôles</option>
+                <option value="admin">Administrateurs</option>
+                <option value="student">Étudiants</option>
+              </select>
+
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm"
+                className="rounded-xl font-bold h-10 px-4 hover:bg-muted shrink-0"
+                onClick={loadUsers} 
+                disabled={loadingUsers}
+              >
+                <RefreshCw className={cn("size-4 mr-2", loadingUsers && "animate-spin")} />
+                Actualiser
+              </Button>
+            </div>
           </div>
 
           <div className="overflow-x-auto custom-scrollbar rounded-2xl border border-border/50 bg-background/30 backdrop-blur-sm">
@@ -201,13 +257,13 @@ export function AccountManagement({ path, navigate }) {
                   <Loader2 className="size-8 animate-spin mx-auto text-primary/20" />
                   <p className="mt-2 text-sm font-bold text-muted-foreground/50">Synchronisation des données...</p>
                 </div>
-              ) : users.length === 0 ? (
+              ) : filteredUsers.length === 0 ? (
                 <div className="px-6 py-12 text-center">
                   <Users className="size-8 mx-auto text-muted-foreground/20" />
                   <p className="mt-2 text-sm font-bold text-muted-foreground/50">Aucun compte trouvé</p>
                 </div>
               ) : (
-                users.map((user) => (
+                filteredUsers.map((user) => (
                   <div key={user.id} className="p-4 space-y-3 transition-colors hover:bg-muted/10">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2">
@@ -234,7 +290,7 @@ export function AccountManagement({ path, navigate }) {
                         </span>
                       </div>
 
-                      <div>
+                      <div className="flex items-center gap-2">
                         {user.status !== "active" && user.status !== "blocked" && (
                           <div className="flex flex-col items-end gap-1.5">
                             <Button
@@ -269,6 +325,23 @@ export function AccountManagement({ path, navigate }) {
                         {user.status === "blocked" && (
                           <span className="text-xs font-bold italic text-rose-500/60">Restreint</span>
                         )}
+
+                        {user.id !== currentUser?.id && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="xs"
+                            className="size-8 p-0 text-muted-foreground hover:text-rose-600 rounded-lg shrink-0"
+                            onClick={() => handleDeleteUser(user.id, user.email)}
+                            disabled={deletingUser === user.id}
+                          >
+                            {deletingUser === user.id ? (
+                              <Loader2 className="size-3.5 animate-spin" />
+                            ) : (
+                              <Trash2 className="size-3.5" />
+                            )}
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -283,7 +356,7 @@ export function AccountManagement({ path, navigate }) {
                   <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Utilisateur</th>
                   <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Rôle</th>
                   <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Statut</th>
-                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Actions</th>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground text-right pr-12">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
@@ -294,7 +367,7 @@ export function AccountManagement({ path, navigate }) {
                        <p className="mt-2 text-sm font-bold text-muted-foreground/50">Synchronisation des données...</p>
                     </td>
                   </tr>
-                ) : users.length === 0 ? (
+                ) : filteredUsers.length === 0 ? (
                   <tr>
                     <td className="px-6 py-12 text-center" colSpan="4">
                        <Users className="size-8 mx-auto text-muted-foreground/20" />
@@ -302,7 +375,7 @@ export function AccountManagement({ path, navigate }) {
                     </td>
                   </tr>
                 ) : (
-                  users.map((user) => (
+                  filteredUsers.map((user) => (
                     <tr key={user.id} className="hover:bg-muted/30 transition-colors group">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
@@ -324,40 +397,59 @@ export function AccountManagement({ path, navigate }) {
                         <StatusBadge status={user.status} />
                       </td>
                       <td className="px-6 py-4">
-                        {user.status !== "active" && user.status !== "blocked" && (
-                          <div className="flex flex-col gap-2">
+                        <div className="flex items-center justify-end gap-3 pr-6">
+                          {user.status !== "active" && user.status !== "blocked" && (
+                            <div className="flex flex-col gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="xs"
+                                className="rounded-lg h-8 font-bold text-[10px] uppercase tracking-wider hover:border-primary hover:text-primary transition-all"
+                                onClick={() => handleRegenerate(user.id)}
+                                disabled={regenerating === user.id}
+                              >
+                                {regenerating === user.id ? (
+                                  <Loader2 className="size-3 animate-spin mr-1" />
+                                ) : (
+                                  <Mail className="size-3 mr-1" />
+                                )}
+                                Renvoyer l'invitation
+                              </Button>
+
+                              {rowInviteLinks[user.id] === 'sent' && (
+                                <span className="text-[10px] font-bold text-emerald-600 animate-in fade-in duration-300">
+                                  Invitation envoyée !
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          {user.status === "active" && (
+                            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-600/60">
+                              <Check className="size-3" />
+                              Finalisé
+                            </div>
+                          )}
+                          {user.status === "blocked" && (
+                            <span className="text-xs font-bold italic text-rose-500/60">Restreint</span>
+                          )}
+
+                          {user.id !== currentUser?.id && (
                             <Button
                               type="button"
-                              variant="outline"
+                              variant="ghost"
                               size="xs"
-                              className="rounded-lg h-8 font-bold text-[10px] uppercase tracking-wider hover:border-primary hover:text-primary transition-all"
-                              onClick={() => handleRegenerate(user.id)}
-                              disabled={regenerating === user.id}
+                              className="size-8 p-0 text-muted-foreground hover:text-rose-600 rounded-lg"
+                              onClick={() => handleDeleteUser(user.id, user.email)}
+                              disabled={deletingUser === user.id}
                             >
-                              {regenerating === user.id ? (
-                                <Loader2 className="size-3 animate-spin mr-1" />
+                              {deletingUser === user.id ? (
+                                <Loader2 className="size-3.5 animate-spin" />
                               ) : (
-                                <Mail className="size-3 mr-1" />
+                                <Trash2 className="size-3.5" />
                               )}
-                              Renvoyer l'invitation
                             </Button>
-
-                            {rowInviteLinks[user.id] === 'sent' && (
-                              <span className="text-[10px] font-bold text-emerald-600 animate-in fade-in duration-300">
-                                Invitation envoyée !
-                              </span>
-                            )}
-                          </div>
-                        )}
-                        {user.status === "active" && (
-                          <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-600/60">
-                            <Check className="size-3" />
-                            Finalisé
-                          </div>
-                        )}
-                        {user.status === "blocked" && (
-                          <span className="text-xs font-bold italic text-rose-500/60">Restreint</span>
-                        )}
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))

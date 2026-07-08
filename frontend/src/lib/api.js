@@ -3,10 +3,10 @@ import { supabase } from "@/supabaseClient"
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000"
 
 async function authHeaders() {
-  const { data } = await supabase.auth.getSession()
-  const token = data.session?.access_token
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
 
-  return token ? { Authorization: `Bearer ${token}` } : {}
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 export async function apiRequest(path, options = {}) {

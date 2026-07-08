@@ -45,6 +45,7 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
       title: "Espace Étudiant",
       items: [
         { label: "Mon espace", path: "/student/dashboard", icon: BookOpen },
+        { label: "Cours & Vidéos", path: "/student/courses", icon: BookOpen },
       ],
     },
   ]
@@ -61,6 +62,7 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
       items: [
         { label: "Logigrammes", path: "/admin/logigrammes", icon: CalendarDays },
         { label: "Filières", path: "/admin/filieres", icon: BookOpen },
+        { label: "Cours & Vidéos", path: "/admin/courses", icon: BookOpen },
         { label: "Formateurs", path: "/admin/formateurs", icon: GraduationCap },
         { label: "Années", path: "/admin/academic-years", icon: Calendar },
       ],
