@@ -412,6 +412,8 @@ router.put('/:id/unites', async (req, res) => {
 // POST /api/logigramme/import
 router.post('/import', upload.single('file'), async (req, res) => {
   const { academic_year_id } = req.body;
+  const replaceSchedule = req.body.replace_schedule === true || req.body.replace_schedule === 'true';
+  const allowMerge = req.body.allow_merge === true || req.body.allow_merge === 'true';
   const file = req.file;
 
   if (!academic_year_id) {
@@ -421,6 +423,10 @@ router.post('/import', upload.single('file'), async (req, res) => {
 
   if (!file) {
     return res.status(400).json({ error: 'Aucun fichier téléchargé.' });
+  }
+  if (replaceSchedule && allowMerge) {
+    if (file) fs.unlinkSync(file.path);
+    return res.status(400).json({ error: 'Utilisez soit replace_schedule=true soit allow_merge=true, pas les deux.' });
   }
 
   const filePath = file.path;
@@ -434,7 +440,7 @@ router.post('/import', upload.single('file'), async (req, res) => {
       '--list-sheets'
     ]);
 
-    if (sheetsResult.error || sheetsResult.status !== 0) {
+    if (sheetsResult.status !== 0 || !sheetsResult.stdout) {
       const errorMsg = sheetsResult.stderr ? sheetsResult.stderr.toString() : 'Impossible de lister les feuilles.';
       throw new Error(errorMsg);
     }
@@ -466,9 +472,9 @@ router.post('/import', upload.single('file'), async (req, res) => {
         '--sheet', sheetName
       ]);
 
-      if (dataResult.error || dataResult.status !== 0) {
-        console.error(`Error parsing sheet ${sheetName}:`, dataResult.stderr?.toString());
-        continue;
+      if (dataResult.status !== 0 || !dataResult.stdout) {
+        const errorMsg = dataResult.stderr ? dataResult.stderr.toString() : 'Erreur inconnue du parseur.';
+        throw new Error(`Erreur parsing feuille "${sheetName}": ${errorMsg}`);
       }
 
       // Log Python parser diagnostics (goes to stderr)
@@ -481,12 +487,11 @@ router.post('/import', upload.single('file'), async (req, res) => {
       const { metadata, unites, weeks } = data;
 
       if (!metadata.filiere || !metadata.classe) {
-        console.warn(`[import] Skipping sheet '${sheetName}': missing filiere='${metadata.filiere}' or classe='${metadata.classe}'`);
-        continue;
+        throw new Error(`Feuille "${sheetName}": filière ou classe manquante.`);
       }
 
       if (unites.length === 0) {
-        console.warn(`[import] ⚠ Sheet '${sheetName}' parsed with 0 unités — check Excel structure`);
+        throw new Error(`Feuille "${sheetName}": 0 unité détectée. Import annulé pour éviter une perte de données.`);
       }
 
       // a. Upsert Filière
@@ -496,8 +501,8 @@ router.post('/import', upload.single('file'), async (req, res) => {
         'aide soignant': 'AS',
         'infirmier en réanimation': 'REA',
         'infirmier en reanimation': 'REA',
-        'infirmier anesthésiste': 'IA',
-        'infirmier anesthesiste': 'IA',
+        'infirmier anesthésiste': 'IAN',
+        'infirmier anesthesiste': 'IAN',
         'infirmier auxiliaire': 'IA',
         'infirmier polyvalent': 'IP',
         'radiologie': 'RADIO',
@@ -549,6 +554,27 @@ router.post('/import', upload.single('file'), async (req, res) => {
       if (logError) throw logError;
       const logigrammeId = logData.id;
 
+      const { data: existingUnits, error: existingUnitsError } = await supabaseAdmin
+        .from('unites_formation')
+        .select('id')
+        .eq('logigramme_id', logigrammeId);
+
+      if (existingUnitsError) throw existingUnitsError;
+      if ((existingUnits || []).length > 0 && !replaceSchedule && !allowMerge) {
+        throw new Error(
+          `Des données existent déjà pour "${filiereName} / ${metadata.classe}". ` +
+          'Envoyez replace_schedule=true pour remplacer le planning, ou allow_merge=true pour fusionner explicitement.'
+        );
+      }
+
+      if ((existingUnits || []).length > 0 && replaceSchedule) {
+        const { error: deleteUnitsError } = await supabaseAdmin
+          .from('unites_formation')
+          .delete()
+          .eq('logigramme_id', logigrammeId);
+        if (deleteUnitsError) throw deleteUnitsError;
+      }
+
       // d. Insert year_weeks (once per year/week)
       const weekDateMap = { ...canonicalWeekDateMap };
       for (let i = 0; i < weeks.length; i++) {
@@ -597,10 +623,9 @@ router.post('/import', upload.single('file'), async (req, res) => {
               .single();
             
             if (iError) {
-              console.error(`Error inserting formateur "${unit.formateur}":`, iError);
-            } else {
-              formateurId = newF.id;
+              throw new Error(`Erreur insertion formateur "${unit.formateur}": ${iError.message}`);
             }
+            formateurId = newF.id;
           }
         }
 
@@ -627,11 +652,14 @@ router.post('/import', upload.single('file'), async (req, res) => {
             semaine: c.week,
             week_start_date: weekDateMap[c.week],
             cell_type: c.type,
-            heures: c.value
+            heures: (Number.isFinite(Number(c.value)) && Number(c.value) > 0) ? Number(c.value) : null
           })).filter(c => c.week_start_date); // Safety check
 
           if (cellInserts.length < unit.cells.length) {
-            console.warn(`[import] ⚠ Unit '${unit.nom}' in sheet '${sheetName}': ${unit.cells.length - cellInserts.length}/${unit.cells.length} cells dropped (missing week_start_date)`);
+            throw new Error(
+              `Unité "${unit.nom}" / feuille "${sheetName}": ` +
+              `${unit.cells.length - cellInserts.length}/${unit.cells.length} cellule(s) sans date semaine. Import annulé.`
+            );
           }
 
           if (cellInserts.length > 0) {

@@ -21,7 +21,7 @@ export function GridRow({ unite, rowIndex, weeksCount = 52, onToggleCell, highli
   const completionPercentage = totalCellsCount > 0 ? Math.round((completedCellsCount / totalCellsCount) * 100) : 0;
 
   return (
-    <div className="flex w-fit hover:bg-slate-50 transition-colors group">
+    <div className="flex w-fit bg-white hover:bg-slate-50 transition-colors group isolate">
       {/* Sticky Left Panel */}
       <div className="sticky left-0 z-20 flex bg-white border-b border-slate-300 group-hover:bg-slate-50 transition-colors select-none flex-shrink-0">
         <div className="w-10 h-12 border-r border-slate-300 flex items-center justify-center text-[11px] font-extrabold text-slate-800 bg-white">{rowIndex}</div>

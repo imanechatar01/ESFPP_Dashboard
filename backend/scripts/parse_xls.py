@@ -415,6 +415,7 @@ def parse_xls(file_path, sheet_name, book=None):
                 cell_type = "tiff"
 
             # 3. Positive numeric → normal session (regardless of colour)
+            # val == 0 falls through to colour-based classification below
             elif isinstance(val, (int, float)) and val > 0:
                 cell_type = "normal"
 
@@ -443,13 +444,23 @@ def parse_xls(file_path, sheet_name, book=None):
                 else:
                     cell_type = "empty"
 
-            # Append non-empty cells OR empty cells that are in override weeks
-            if cell_type != "empty" or (isinstance(val, (int, float)) and val > 0):
+            # Append non-empty cells.
+            # For 'normal' type: only store if value is a positive number.
+            # For other types (vacation/exam/tiff): always store.
+            skip = False
+            if cell_type == "empty":
+                skip = True
+            elif cell_type == "normal" and not (isinstance(val, (int, float)) and val > 0):
+                # Colour-matched as 'normal' but has no positive numeric value — treat as empty
+                skip = True
+
+            if not skip:
                 week_idx = col_idx - 4  # 0-based index into week_dates
+                numeric_value = val if isinstance(val, (int, float)) and val > 0 else None
                 cells.append({
                     "week": col_idx - 3,  # 1-based week number for API compat
                     "type": cell_type,
-                    "value": val if isinstance(val, (int, float)) else None,
+                    "value": numeric_value,
                     "date": week_dates[week_idx] if week_idx < len(week_dates) else None,
                 })
 

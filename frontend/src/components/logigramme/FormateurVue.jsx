@@ -5,32 +5,34 @@ import { GridHeader } from './GridHeader';
 import { GridRow } from './GridRow';
 import { Legend } from './Legend';
 import { Loader2, AlertTriangle, Info } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
-export function FormateurVue({ formateurId, onToggleCell, onMarkWeek }) {
+export function FormateurVue({ formateurId }) {
   const { filters } = useLogigrammeContext();
   const [data, setData] = useState(null);
   const [weeks, setWeeks] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    async function fetchFormateurData() {
-      if (!formateurId) return;
-      setLoading(true);
-      try {
-        const [res, weeksRes] = await Promise.all([
-          apiRequest(`/api/formateurs/${formateurId}/unites`),
-          apiRequest(`/api/years/${filters.year_id}/weeks`)
-        ]);
-        setData(res);
-        setWeeks(weeksRes);
-      } catch (err) {
-        console.error('Failed to fetch formateur data:', err);
-      } finally {
-        setLoading(false);
-      }
+  const fetchFormateurData = async () => {
+    if (!formateurId) return;
+    try {
+      const [res, weeksRes] = await Promise.all([
+        apiRequest(`/api/formateurs/${formateurId}/unites`),
+        apiRequest(`/api/years/${filters.year_id}/weeks`)
+      ]);
+      setData(res);
+      setWeeks(weeksRes);
+    } catch (err) {
+      console.error('Failed to fetch formateur data:', err);
     }
-    fetchFormateurData();
+  };
+
+  useEffect(() => {
+    async function init() {
+      setLoading(true);
+      await fetchFormateurData();
+      setLoading(false);
+    }
+    init();
   }, [formateurId, filters.year_id]);
 
   if (loading && (!data || !weeks)) {
@@ -45,7 +47,7 @@ export function FormateurVue({ formateurId, onToggleCell, onMarkWeek }) {
   if (!data || !weeks) return null;
 
   const { unites, conflicts } = data;
-  
+
   // Group units by logigramme
   const logigrammeGroups = unites.reduce((acc, unit) => {
     const logId = unit.logigramme_id;
@@ -61,9 +63,65 @@ export function FormateurVue({ formateurId, onToggleCell, onMarkWeek }) {
 
   const totalVhg = unites.reduce((sum, u) => sum + (parseFloat(u.vhg) || 0), 0);
 
+  // ── Cell Interaction Handlers ──────────────────────────────────────────
+  const handleToggleCell = async (cellId, currentStatus) => {
+    const isDone = currentStatus === 'done' || currentStatus === 'auto_done';
+    const nextStatus = isDone ? 'pending' : 'done';
+
+    // Optimistic state update in FormateurVue
+    setData(prev => {
+      if (!prev) return prev;
+      const nextUnites = prev.unites.map(u => {
+        const hasCell = u.cells.some(c => c.id === cellId);
+        if (!hasCell) return u;
+
+        const nextCells = u.cells.map(c =>
+          c.id === cellId ? { ...c, completion_status: nextStatus } : c
+        );
+
+        // Recalculate vh_realise
+        const vh_realise = nextCells
+          .filter(c => c.cell_type === 'normal' && (c.completion_status === 'done' || c.completion_status === 'auto_done'))
+          .reduce((sum, c) => sum + (parseFloat(c.heures) || 0), 0);
+
+        return {
+          ...u,
+          cells: nextCells,
+          vh_realise,
+          vh_restant: u.vhg - vh_realise,
+          taux: u.vhg > 0 ? vh_realise / u.vhg : 0,
+        };
+      });
+      return { ...prev, unites: nextUnites };
+    });
+
+    try {
+      await apiRequest(`/api/completion/cell/${cellId}`, {
+        method: 'POST',
+        body: JSON.stringify({ status: nextStatus })
+      });
+    } catch (err) {
+      console.error('Failed to toggle cell:', err);
+      fetchFormateurData(); // Revert on error
+    }
+  };
+
+  const handleMarkWeek = async (logigrammeId, semaine, status) => {
+    try {
+      await apiRequest(`/api/completion/week`, {
+        method: 'POST',
+        body: JSON.stringify({ logigramme_id: logigrammeId, semaine, status })
+      });
+      // Refresh list to update all cells in that logigramme
+      await fetchFormateurData();
+    } catch (err) {
+      console.error('Failed to mark week:', err);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Banner */}
+      {/* ── Info Banner ─────────────────────────────────────────────────── */}
       <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="size-10 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -76,18 +134,18 @@ export function FormateurVue({ formateurId, onToggleCell, onMarkWeek }) {
             </p>
           </div>
         </div>
-        
+
         {conflicts.length > 0 && (
           <div className="flex items-center gap-3 px-4 py-2 bg-destructive/10 border border-destructive/20 rounded-xl animate-bounce">
             <AlertTriangle className="size-4 text-destructive" />
             <p className="text-xs font-black text-destructive uppercase tracking-widest">
-              {conflicts.length} conflit{conflicts.length > 1 ? 's' : ''} d'horaire détecté{conflicts.length > 1 ? 's' : ''}
+              {conflicts.length} conflit{conflicts.length > 1 ? 's' : ''} d&apos;horaire détecté{conflicts.length > 1 ? 's' : ''}
             </p>
           </div>
         )}
       </div>
 
-      {/* Conflicts List (Task E) */}
+      {/* ── Conflicts List ───────────────────────────────────────────────── */}
       {conflicts.length > 0 && (
         <div className="p-4 rounded-2xl border border-destructive/20 bg-destructive/5 space-y-3">
           <h4 className="text-[10px] font-black uppercase tracking-widest text-destructive/60">Détails des conflits</h4>
@@ -108,7 +166,7 @@ export function FormateurVue({ formateurId, onToggleCell, onMarkWeek }) {
         </div>
       )}
 
-      {/* Grids per Logigramme */}
+      {/* ── Grids per Logigramme ────────────────────────────────────────── */}
       {Object.values(logigrammeGroups).map((group) => (
         <div key={group.meta.id} className="space-y-3">
           <div className="flex items-center gap-2 px-1">
@@ -123,15 +181,23 @@ export function FormateurVue({ formateurId, onToggleCell, onMarkWeek }) {
           <div className="relative rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
             <div className="overflow-x-auto custom-scrollbar">
               <div className="w-fit min-w-full">
-                <GridHeader weeks={weeks} onMarkWeek={onMarkWeek} />
+                <GridHeader
+                  weeks={weeks}
+                  onMarkWeek={(sem, status) => {
+                    if (confirm(`Voulez-vous marquer toute la semaine ${sem} comme '${status}'?`)) {
+                      handleMarkWeek(group.meta.id, sem, status);
+                    }
+                  }}
+                />
                 <div className="flex flex-col">
-                  {group.items.map(unite => (
+                  {group.items.map((unite, idx) => (
                     <GridRow
                       key={unite.id}
                       unite={unite}
+                      rowIndex={idx + 1}
                       weeksCount={weeks.length}
-                      onToggleCell={onToggleCell}
-                      highlightWeeks={conflicts.map(c => c.semaine)}
+                      onToggleCell={handleToggleCell}
+                      highlightWeeks={[]}
                     />
                   ))}
                 </div>
@@ -140,7 +206,7 @@ export function FormateurVue({ formateurId, onToggleCell, onMarkWeek }) {
           </div>
         </div>
       ))}
-      
+
       <Legend />
     </div>
   );

@@ -36,7 +36,7 @@ export function GridCell({ cell, onToggle, isHighlighted = false }) {
       {cell_type === 'tiff' && 'T'}
       {isNormal && (
         <>
-          <span>{Math.round(heures)}</span>
+          <span>{heures > 0 ? Math.round(heures) : ''}</span>
           {isDone && <span className="absolute top-0.5 right-0.5 text-[8px] font-bold text-emerald-600">✔</span>}
         </>
       )}

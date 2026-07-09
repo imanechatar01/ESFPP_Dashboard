@@ -107,6 +107,8 @@ router.get('/:id/unites', async (req, res) => {
         ordre,
         nom,
         vhg,
+        formateur_id,
+        formateur:formateurs (*),
         logigramme_id,
         logigramme:logigrammes (
           id,
@@ -127,14 +129,23 @@ router.get('/:id/unites', async (req, res) => {
 
     if (unitsError) throw unitsError;
 
-    // 2. Process units and find conflicts
-    const processedUnits = units.map(u => ({
-      ...u,
-      cells: u.cells.map(c => ({
+    // 2. Process units: flatten completion, compute vh_realise (same logic as logigrammes.js)
+    const processedUnits = units.map(u => {
+      const processedCells = u.cells.map(c => ({
         ...c,
         completion_status: c.completion?.status || 'pending'
-      }))
-    }));
+      }));
+      const vh_realise = processedCells
+        .filter(c => c.cell_type === 'normal' && (c.completion_status === 'done' || c.completion_status === 'auto_done'))
+        .reduce((sum, c) => sum + (parseFloat(c.heures) || 0), 0);
+      return {
+        ...u,
+        cells: processedCells,
+        vh_realise,
+        vh_restant: u.vhg - vh_realise,
+        taux: u.vhg > 0 ? vh_realise / u.vhg : 0
+      };
+    });
 
     // Conflict Detection (Task E)
     // A conflict = same formateur has a normal cell with heures > 0 in the same semaine across 2+ logigrammes
