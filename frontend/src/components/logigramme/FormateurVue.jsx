@@ -130,6 +130,80 @@ export function FormateurVue({ formateurId }) {
     }
   };
 
+  const handleCreateCell = async (uniteId, semaine, heures) => {
+    // Determine completion_status based on auto_done logic
+    const today = new Date().toISOString().split('T')[0];
+    const week = weeks?.find(w => w.semaine === semaine);
+    const isPast = week?.week_start_date && week.week_start_date < today;
+    const completionStatus = isPast ? 'auto_done' : 'pending';
+
+    const tempId = `temp-${Date.now()}`;
+    const optimisticCell = {
+      id: tempId,
+      semaine,
+      cell_type: 'normal',
+      heures,
+      week_start_date: week?.week_start_date || null,
+      completion_status: completionStatus,
+    };
+
+    // Optimistic UI update
+    setData(prev => {
+      if (!prev) return prev;
+      const nextUnites = prev.unites.map(u => {
+        if (u.id !== uniteId) return u;
+        const nextCells = [...u.cells, optimisticCell];
+        const vh_realise = nextCells
+          .filter(c => c.cell_type === 'normal' && (c.completion_status === 'done' || c.completion_status === 'auto_done'))
+          .reduce((sum, c) => sum + (parseFloat(c.heures) || 0), 0);
+        return {
+          ...u,
+          cells: nextCells,
+          vh_realise,
+          vh_restant: u.vhg - vh_realise,
+          taux: u.vhg > 0 ? vh_realise / u.vhg : 0,
+        };
+      });
+      return { ...prev, unites: nextUnites };
+    });
+
+    try {
+      await apiRequest('/api/logigramme/cell', {
+        method: 'POST',
+        body: JSON.stringify({
+          unite_id: uniteId,
+          semaine,
+          cell_type: 'normal',
+          heures,
+        })
+      });
+      // Refetch to get real DB ids and sync state
+      await fetchFormateurData();
+    } catch (err) {
+      console.error('Failed to create cell:', err);
+      // Rollback
+      setData(prev => {
+        if (!prev) return prev;
+        const nextUnites = prev.unites.map(u => {
+          if (u.id !== uniteId) return u;
+          const nextCells = u.cells.filter(c => c.id !== tempId);
+          const vh_realise = nextCells
+            .filter(c => c.cell_type === 'normal' && (c.completion_status === 'done' || c.completion_status === 'auto_done'))
+            .reduce((sum, c) => sum + (parseFloat(c.heures) || 0), 0);
+          return {
+            ...u,
+            cells: nextCells,
+            vh_realise,
+            vh_restant: u.vhg - vh_realise,
+            taux: u.vhg > 0 ? vh_realise / u.vhg : 0,
+          };
+        });
+        return { ...prev, unites: nextUnites };
+      });
+      throw err; // Re-throw so GridCell can show error flash
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* ── Info Banner ─────────────────────────────────────────────────── */}
@@ -208,6 +282,7 @@ export function FormateurVue({ formateurId }) {
                       rowIndex={idx + 1}
                       weeksCount={weeks.length}
                       onToggleCell={handleToggleCell}
+                      onCreateCell={handleCreateCell}
                       highlightWeeks={[]}
                     />
                   ))}

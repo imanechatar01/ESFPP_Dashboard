@@ -1,6 +1,6 @@
 import { GridCell } from './GridCell';
 
-export function GridRow({ unite, rowIndex, weeksCount = 52, onToggleCell, highlightWeeks = [] }) {
+export function GridRow({ unite, rowIndex, weeksCount = 52, onToggleCell, onCreateCell, highlightWeeks = [] }) {
   const { nom, formateur, vhg, vh_realise, cells } = unite;
   const taux = vhg > 0 ? (vh_realise / vhg) * 100 : 0;
 
@@ -36,7 +36,9 @@ export function GridRow({ unite, rowIndex, weeksCount = 52, onToggleCell, highli
           <GridCell
             key={idx}
             cell={cell}
+            semaine={idx + 1}
             onToggle={onToggleCell}
+            onCreateCell={onCreateCell ? (semaine, heures) => onCreateCell(unite.id, semaine, heures) : undefined}
             isHighlighted={cell && highlightWeeks.includes(cell.semaine)}
           />
         ))}

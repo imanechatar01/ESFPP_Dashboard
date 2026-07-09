@@ -3,7 +3,7 @@ import { GridRow } from './GridRow';
 import { Legend } from './Legend';
 import { Loader2 } from 'lucide-react';
 
-export function LogigrammeGrid({ data, loading, onToggleCell, onMarkWeek }) {
+export function LogigrammeGrid({ data, loading, onToggleCell, onMarkWeek, onCreateCell }) {
   if (loading && !data) {
     return (
       <div className="flex flex-col items-center justify-center py-20 bg-card rounded-2xl border border-border">
@@ -37,6 +37,7 @@ export function LogigrammeGrid({ data, loading, onToggleCell, onMarkWeek }) {
                 rowIndex={index + 1}
                 weeksCount={weeks.length}
                 onToggleCell={onToggleCell}
+                onCreateCell={onCreateCell}
               />
             ))}
           </div>

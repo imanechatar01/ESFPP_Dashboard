@@ -83,6 +83,96 @@ export function useLogigramme(logigrammeId) {
     }
   };
 
+  const createCell = async (uniteId, semaine, heures) => {
+    // Determine completion_status based on auto_done logic (same as backend)
+    const today = new Date().toISOString().split('T')[0];
+    const week = data?.weeks?.find(w => w.semaine === semaine);
+    const isPast = week?.week_start_date && week.week_start_date < today;
+    const completionStatus = isPast ? 'auto_done' : 'pending';
+
+    // Build optimistic cell object with a temporary id
+    const tempId = `temp-${Date.now()}`;
+    const optimisticCell = {
+      id: tempId,
+      semaine,
+      cell_type: 'normal',
+      heures,
+      week_start_date: week?.week_start_date || null,
+      completion_status: completionStatus,
+    };
+
+    // Optimistic UI update — add cell and recalculate progress instantly
+    setData(prev => {
+      if (!prev) return prev;
+      const nextUnites = prev.unites.map(u => {
+        if (u.id !== uniteId) return u;
+
+        const nextCells = [...u.cells, optimisticCell];
+        // Recalculate vh_realise — same formula as logigrammes.js:L299-L301
+        const vh_realise = nextCells
+          .filter(c => c.cell_type === 'normal' && (c.completion_status === 'done' || c.completion_status === 'auto_done'))
+          .reduce((sum, c) => sum + (parseFloat(c.heures) || 0), 0);
+        return {
+          ...u,
+          cells: nextCells,
+          vh_realise,
+          vh_restant: u.vhg - vh_realise,
+          taux: u.vhg > 0 ? vh_realise / u.vhg : 0,
+        };
+      });
+      return { ...prev, unites: nextUnites };
+    });
+
+    try {
+      const savedCell = await apiRequest('/api/logigramme/cell', {
+        method: 'POST',
+        body: JSON.stringify({
+          unite_id: uniteId,
+          semaine,
+          cell_type: 'normal',
+          heures,
+        })
+      });
+
+      // Replace temporary cell with real DB cell (update the id)
+      setData(prev => {
+        if (!prev) return prev;
+        const nextUnites = prev.unites.map(u => {
+          if (u.id !== uniteId) return u;
+          const nextCells = u.cells.map(c =>
+            c.id === tempId
+              ? { ...c, id: savedCell.id, week_start_date: savedCell.week_start_date }
+              : c
+          );
+          return { ...u, cells: nextCells };
+        });
+        return { ...prev, unites: nextUnites };
+      });
+    } catch (err) {
+      // Rollback: remove the optimistic cell and recalculate
+      console.error('[useLogigramme] createCell failed, reverting:', err.message);
+      setData(prev => {
+        if (!prev) return prev;
+        const nextUnites = prev.unites.map(u => {
+          if (u.id !== uniteId) return u;
+          const nextCells = u.cells.filter(c => c.id !== tempId);
+          const vh_realise = nextCells
+            .filter(c => c.cell_type === 'normal' && (c.completion_status === 'done' || c.completion_status === 'auto_done'))
+            .reduce((sum, c) => sum + (parseFloat(c.heures) || 0), 0);
+          return {
+            ...u,
+            cells: nextCells,
+            vh_realise,
+            vh_restant: u.vhg - vh_realise,
+            taux: u.vhg > 0 ? vh_realise / u.vhg : 0,
+          };
+        });
+        return { ...prev, unites: nextUnites };
+      });
+      throw err; // Re-throw so GridCell can show error flash
+    }
+  };
+
   const markWeek = async (semaine, status) => {
     try {
       await apiRequest(`/api/completion/week`, {
@@ -95,5 +185,5 @@ export function useLogigramme(logigrammeId) {
     }
   };
 
-  return { data, loading, error, toggleCell, markWeek, refresh: fetchLogigramme };
+  return { data, loading, error, toggleCell, createCell, markWeek, refresh: fetchLogigramme };
 }

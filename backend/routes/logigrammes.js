@@ -349,6 +349,63 @@ router.put('/:id/auto-complete', async (req, res) => {
   }
 });
 
+// POST /api/logigramme/cell — Create or update a single week_cell
+router.post('/cell', async (req, res) => {
+  const { unite_id, semaine, cell_type, heures } = req.body;
+
+  if (!unite_id || !semaine) {
+    return res.status(400).json({ error: 'unite_id et semaine sont requis.' });
+  }
+
+  try {
+    // 1. Resolve academic_year_id via the unite's logigramme
+    const { data: unite, error: uniteError } = await supabaseAdmin
+      .from('unites_formation')
+      .select('logigramme_id, logigramme:logigrammes (academic_year_id)')
+      .eq('id', unite_id)
+      .single();
+
+    if (uniteError || !unite) {
+      return res.status(404).json({ error: 'Unité introuvable.' });
+    }
+
+    const academicYearId = unite.logigramme.academic_year_id;
+
+    // 2. Resolve week_start_date from year_weeks
+    const { data: weekRow, error: weekError } = await supabaseAdmin
+      .from('year_weeks')
+      .select('week_start_date')
+      .eq('academic_year_id', academicYearId)
+      .eq('semaine', semaine)
+      .single();
+
+    if (weekError || !weekRow) {
+      return res.status(404).json({ error: `Semaine ${semaine} introuvable pour cette année académique.` });
+    }
+
+    // 3. Upsert into week_cells
+    const { data: cell, error: cellError } = await supabaseAdmin
+      .from('week_cells')
+      .upsert({
+        unite_id,
+        semaine,
+        cell_type: cell_type || 'normal',
+        heures: (Number.isFinite(Number(heures)) && Number(heures) > 0) ? Number(heures) : null,
+        week_start_date: weekRow.week_start_date
+      }, { onConflict: 'unite_id, semaine' })
+      .select()
+      .single();
+
+    if (cellError) throw cellError;
+
+    console.log(`[logigramme] Upserted cell: unite=${unite_id}, semaine=${semaine}, heures=${heures}`);
+    res.json(cell);
+  } catch (err) {
+    console.error('[logigramme] Cell upsert error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // DELETE /api/logigramme/:id
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;

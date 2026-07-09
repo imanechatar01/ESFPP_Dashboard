@@ -34,6 +34,7 @@ export function LogigrammeView({ path, navigate }) {
     data: activeLog,
     loading: loadingGrid,
     toggleCell,
+    createCell,
     markWeek,
     refresh: refreshGrid
   } = useLogigramme(activeLogId)
@@ -253,6 +254,7 @@ export function LogigrammeView({ path, navigate }) {
                 data={activeLog}
                 loading={loadingGrid}
                 onToggleCell={toggleCell}
+                onCreateCell={createCell}
                 onMarkWeek={markWeek}
               />
             ) : (
