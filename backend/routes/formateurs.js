@@ -175,11 +175,20 @@ router.get('/:id/unites', async (req, res) => {
     console.log('[FormateursAPI] Final filtered units:', filteredUnits.length);
 
     // 2. Process units: flatten completion, compute vh_realise (same logic as logigrammes.js)
+    const today = new Date().toISOString().split('T')[0];
     const processedUnits = filteredUnits.map(u => {
-      const processedCells = u.cells.map(c => ({
-        ...c,
-        completion_status: c.completion?.status || 'pending'
-      }));
+      const processedCells = u.cells.map(c => {
+        let status = c.completion?.status || 'pending';
+        if (status === 'pending') {
+          if (c.week_start_date && c.week_start_date < today) {
+            status = 'auto_done';
+          }
+        }
+        return {
+          ...c,
+          completion_status: status
+        };
+      });
       const vh_realise = processedCells
         .filter(c => c.cell_type === 'normal' && (c.completion_status === 'done' || c.completion_status === 'auto_done'))
         .reduce((sum, c) => sum + (parseFloat(c.heures) || 0), 0);

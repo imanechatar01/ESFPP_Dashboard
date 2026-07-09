@@ -80,6 +80,7 @@ router.get('/kpis', async (req, res) => {
         cells:week_cells (
           cell_type,
           heures,
+          week_start_date,
           completion:completions (status)
         )
       `)
@@ -95,6 +96,7 @@ router.get('/kpis', async (req, res) => {
     const uniqueFormateurIds = new Set();
     let totalVhg = 0;
     let totalRealise = 0;
+    const today = new Date().toISOString().split('T')[0];
 
     for (const unit of units) {
       uniqueLogIds.add(unit.logigramme_id);
@@ -104,7 +106,12 @@ router.get('/kpis', async (req, res) => {
       const cells = unit.cells || [];
       for (const cell of cells) {
         if (cell.cell_type === 'normal') {
-          const status = cell.completion?.status;
+          let status = cell.completion?.status;
+          if (!status || status === 'pending') {
+            if (cell.week_start_date && cell.week_start_date < today) {
+              status = 'auto_done';
+            }
+          }
           if (status === 'done' || status === 'auto_done') {
             totalRealise += (parseFloat(cell.heures) || 0);
           }
@@ -172,6 +179,7 @@ router.get('/list', async (req, res) => {
     }
 
     // For each logigramme, compute aggregations
+    const today = new Date().toISOString().split('T')[0];
     const enrichedLogigrammes = await Promise.all(filteredLogigrammes.map(async (log) => {
       // Get units for this logigramme
       const { data: units, error: unitsError } = await supabaseAdmin
@@ -183,6 +191,7 @@ router.get('/list', async (req, res) => {
             id,
             cell_type,
             heures,
+            week_start_date,
             completion:completions (status)
           )
         `)
@@ -201,7 +210,12 @@ router.get('/list', async (req, res) => {
         const cells = unit.cells || [];
         for (const cell of cells) {
           if (cell.cell_type === 'normal') {
-            const status = cell.completion?.status;
+            let status = cell.completion?.status;
+            if (!status || status === 'pending') {
+              if (cell.week_start_date && cell.week_start_date < today) {
+                status = 'auto_done';
+              }
+            }
             if (status === 'done' || status === 'auto_done') {
               vh_realise += parseFloat(cell.heures) || 0;
             }
@@ -267,6 +281,7 @@ router.get('/:id', async (req, res) => {
           semaine,
           cell_type,
           heures,
+          week_start_date,
           completion:completions (status)
         )
       `)
@@ -276,11 +291,20 @@ router.get('/:id', async (req, res) => {
     if (unitesError) throw unitesError;
 
     // Flatten completion status and add calculations
+    const today = new Date().toISOString().split('T')[0];
     const processedUnites = unites.map(u => {
-      const processedCells = u.cells.map(c => ({
-        ...c,
-        completion_status: c.completion?.status || 'pending'
-      }));
+      const processedCells = u.cells.map(c => {
+        let status = c.completion?.status || 'pending';
+        if (status === 'pending') {
+          if (c.week_start_date && c.week_start_date < today) {
+            status = 'auto_done';
+          }
+        }
+        return {
+          ...c,
+          completion_status: status
+        };
+      });
 
       const vh_realise = processedCells
         .filter(c => c.cell_type === 'normal' && (c.completion_status === 'done' || c.completion_status === 'auto_done'))
