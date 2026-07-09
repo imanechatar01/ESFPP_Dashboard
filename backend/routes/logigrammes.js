@@ -478,6 +478,34 @@ router.put('/:id/unites', async (req, res) => {
       if (error) {
         console.error(`[logigramme] Error updating unité ${unit.id}:`, error.message);
       } else {
+        // --- REDISTRIBUTION AUTOMATIQUE DU VHG ---
+        if (unit.vhg !== undefined) {
+          const newVhg = parseFloat(unit.vhg) || 0;
+          
+          const { data: existingCells, error: cellsError } = await supabaseAdmin
+            .from('week_cells')
+            .select('id, semaine')
+            .eq('unite_id', unit.id)
+            .eq('cell_type', 'normal');
+
+          if (!cellsError && existingCells && existingCells.length > 0) {
+            const numCells = existingCells.length;
+            const baseHeures = Math.floor(newVhg / numCells);
+            const remainder = newVhg % numCells;
+
+            existingCells.sort((a, b) => a.semaine - b.semaine);
+
+            for (let i = 0; i < numCells; i++) {
+              const allocated = baseHeures + (i < remainder ? 1 : 0);
+              await supabaseAdmin
+                .from('week_cells')
+                .update({ heures: allocated })
+                .eq('id', existingCells[i].id);
+            }
+            console.log(`[logigramme] Redistributed ${newVhg}h across ${numCells} cells for unité ${unit.id}`);
+          }
+        }
+        
         results.push(data);
       }
     }

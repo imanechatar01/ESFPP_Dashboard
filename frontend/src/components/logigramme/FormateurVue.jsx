@@ -138,21 +138,38 @@ export function FormateurVue({ formateurId }) {
     const completionStatus = isPast ? 'auto_done' : 'pending';
 
     const tempId = `temp-${Date.now()}`;
-    const optimisticCell = {
-      id: tempId,
-      semaine,
-      cell_type: 'normal',
-      heures,
-      week_start_date: week?.week_start_date || null,
-      completion_status: completionStatus,
-    };
+    let isUpdate = false;
+    let oldCell = null;
 
     // Optimistic UI update
     setData(prev => {
       if (!prev) return prev;
       const nextUnites = prev.unites.map(u => {
         if (u.id !== uniteId) return u;
-        const nextCells = [...u.cells, optimisticCell];
+
+        const existingCellIndex = u.cells.findIndex(c => c.semaine === semaine);
+        let nextCells;
+
+        if (existingCellIndex >= 0) {
+          isUpdate = true;
+          oldCell = u.cells[existingCellIndex];
+          nextCells = [...u.cells];
+          nextCells[existingCellIndex] = {
+            ...oldCell,
+            heures,
+          };
+        } else {
+          const optimisticCell = {
+            id: tempId,
+            semaine,
+            cell_type: 'normal',
+            heures,
+            week_start_date: week?.week_start_date || null,
+            completion_status: completionStatus,
+          };
+          nextCells = [...u.cells, optimisticCell];
+        }
+
         const vh_realise = nextCells
           .filter(c => c.cell_type === 'normal' && (c.completion_status === 'done' || c.completion_status === 'auto_done'))
           .reduce((sum, c) => sum + (parseFloat(c.heures) || 0), 0);
@@ -186,7 +203,12 @@ export function FormateurVue({ formateurId }) {
         if (!prev) return prev;
         const nextUnites = prev.unites.map(u => {
           if (u.id !== uniteId) return u;
-          const nextCells = u.cells.filter(c => c.id !== tempId);
+          let nextCells;
+          if (isUpdate) {
+            nextCells = u.cells.map(c => c.semaine === semaine ? oldCell : c);
+          } else {
+            nextCells = u.cells.filter(c => c.id !== tempId);
+          }
           const vh_realise = nextCells
             .filter(c => c.cell_type === 'normal' && (c.completion_status === 'done' || c.completion_status === 'auto_done'))
             .reduce((sum, c) => sum + (parseFloat(c.heures) || 0), 0);

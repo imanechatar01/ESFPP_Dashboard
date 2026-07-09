@@ -90,28 +90,45 @@ export function useLogigramme(logigrammeId) {
     const isPast = week?.week_start_date && week.week_start_date < today;
     const completionStatus = isPast ? 'auto_done' : 'pending';
 
-    // Build optimistic cell object with a temporary id
     const tempId = `temp-${Date.now()}`;
-    const optimisticCell = {
-      id: tempId,
-      semaine,
-      cell_type: 'normal',
-      heures,
-      week_start_date: week?.week_start_date || null,
-      completion_status: completionStatus,
-    };
+    let isUpdate = false;
+    let oldCell = null;
 
-    // Optimistic UI update — add cell and recalculate progress instantly
+    // Optimistic UI update
     setData(prev => {
       if (!prev) return prev;
       const nextUnites = prev.unites.map(u => {
         if (u.id !== uniteId) return u;
 
-        const nextCells = [...u.cells, optimisticCell];
-        // Recalculate vh_realise — same formula as logigrammes.js:L299-L301
+        const existingCellIndex = u.cells.findIndex(c => c.semaine === semaine);
+        let nextCells;
+
+        if (existingCellIndex >= 0) {
+          isUpdate = true;
+          oldCell = u.cells[existingCellIndex];
+          nextCells = [...u.cells];
+          nextCells[existingCellIndex] = {
+            ...oldCell,
+            heures,
+            // Keep existing ID so toggle still works while saving
+          };
+        } else {
+          const optimisticCell = {
+            id: tempId,
+            semaine,
+            cell_type: 'normal',
+            heures,
+            week_start_date: week?.week_start_date || null,
+            completion_status: completionStatus,
+          };
+          nextCells = [...u.cells, optimisticCell];
+        }
+
+        // Recalculate vh_realise
         const vh_realise = nextCells
           .filter(c => c.cell_type === 'normal' && (c.completion_status === 'done' || c.completion_status === 'auto_done'))
           .reduce((sum, c) => sum + (parseFloat(c.heures) || 0), 0);
+        
         return {
           ...u,
           cells: nextCells,
@@ -134,28 +151,38 @@ export function useLogigramme(logigrammeId) {
         })
       });
 
-      // Replace temporary cell with real DB cell (update the id)
-      setData(prev => {
-        if (!prev) return prev;
-        const nextUnites = prev.unites.map(u => {
-          if (u.id !== uniteId) return u;
-          const nextCells = u.cells.map(c =>
-            c.id === tempId
-              ? { ...c, id: savedCell.id, week_start_date: savedCell.week_start_date }
-              : c
-          );
-          return { ...u, cells: nextCells };
+      // If it was a new cell, replace temporary cell with real DB cell (update the id)
+      if (!isUpdate) {
+        setData(prev => {
+          if (!prev) return prev;
+          const nextUnites = prev.unites.map(u => {
+            if (u.id !== uniteId) return u;
+            const nextCells = u.cells.map(c =>
+              c.id === tempId
+                ? { ...c, id: savedCell.id, week_start_date: savedCell.week_start_date }
+                : c
+            );
+            return { ...u, cells: nextCells };
+          });
+          return { ...prev, unites: nextUnites };
         });
-        return { ...prev, unites: nextUnites };
-      });
+      }
     } catch (err) {
-      // Rollback: remove the optimistic cell and recalculate
+      // Rollback
       console.error('[useLogigramme] createCell failed, reverting:', err.message);
       setData(prev => {
         if (!prev) return prev;
         const nextUnites = prev.unites.map(u => {
           if (u.id !== uniteId) return u;
-          const nextCells = u.cells.filter(c => c.id !== tempId);
+          let nextCells;
+          if (isUpdate) {
+            // Restore old cell
+            nextCells = u.cells.map(c => c.semaine === semaine ? oldCell : c);
+          } else {
+            // Remove optimistic cell
+            nextCells = u.cells.filter(c => c.id !== tempId);
+          }
+          
           const vh_realise = nextCells
             .filter(c => c.cell_type === 'normal' && (c.completion_status === 'done' || c.completion_status === 'auto_done'))
             .reduce((sum, c) => sum + (parseFloat(c.heures) || 0), 0);
