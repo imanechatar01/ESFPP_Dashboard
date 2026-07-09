@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react"
-import { Activity, Check, ClipboardCopy, ExternalLink, Loader2, Link2, MailPlus, RefreshCw, Users, X, UserPlus, Shield, User, CalendarDays } from "lucide-react"
+import { Activity, Check, ClipboardCopy, ExternalLink, Loader2, Link2, MailPlus, RefreshCw, Users, X, UserPlus, Shield, User, CalendarDays, Search } from "lucide-react"
 import { DashboardShell } from "@/components/layout/dashboard-shell"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -110,6 +110,7 @@ export function AccountManagement({ path, navigate }) {
   const [inviteLink, setInviteLink] = useState("")
   const [regenerating, setRegenerating] = useState(null)
   const [rowInviteLinks, setRowInviteLinks] = useState({})
+  const [searchQuery, setSearchQuery] = useState("")
   const formRef = useRef(null)
 
   async function loadUsers() {
@@ -172,6 +173,16 @@ export function AccountManagement({ path, navigate }) {
       setRegenerating(null)
     }
   }
+
+  // Filter users based on search query
+  const filteredUsers = users.filter((user) => {
+    const query = searchQuery.toLowerCase()
+    return (
+      user.email.toLowerCase().includes(query) ||
+      user.role.toLowerCase().includes(query) ||
+      user.status.toLowerCase().includes(query)
+    )
+  })
 
   return (
     <DashboardShell
@@ -248,27 +259,39 @@ export function AccountManagement({ path, navigate }) {
 
         {/* Users table */}
         <section className="rounded-2xl border border-border bg-card p-6 shadow-sm medical-glass">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-accent/10">
-                <Users className="size-5 text-accent" />
+          <div className="flex flex-col gap-4 mb-8">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-accent/10">
+                  <Users className="size-5 text-accent" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold tracking-tight">Annuaire des comptes</h2>
+                  <p className="text-xs text-muted-foreground font-medium">{users.length} utilisateurs enregistrés</p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-lg font-bold tracking-tight">Annuaire des comptes</h2>
-                <p className="text-xs text-muted-foreground font-medium">{users.length} utilisateurs enregistrés</p>
-              </div>
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm"
+                className="rounded-xl font-bold h-10 px-4 hover:bg-muted"
+                onClick={loadUsers} 
+                disabled={loadingUsers}
+              >
+                <RefreshCw className={cn("size-4 mr-2", loadingUsers && "animate-spin")} />
+                Actualiser
+              </Button>
             </div>
-            <Button 
-              type="button" 
-              variant="outline" 
-              size="sm"
-              className="rounded-xl font-bold h-10 px-4 hover:bg-muted"
-              onClick={loadUsers} 
-              disabled={loadingUsers}
-            >
-              <RefreshCw className={cn("size-4 mr-2", loadingUsers && "animate-spin")} />
-              Actualiser
-            </Button>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Rechercher par email, rôle ou statut..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 rounded-xl"
+              />
+            </div>
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-border/50 bg-background/30 backdrop-blur-sm">
@@ -296,8 +319,15 @@ export function AccountManagement({ path, navigate }) {
                        <p className="mt-2 text-sm font-bold text-muted-foreground/50">Aucun compte trouvé</p>
                     </td>
                   </tr>
+                ) : filteredUsers.length === 0 ? (
+                  <tr>
+                    <td className="px-6 py-12 text-center" colSpan="4">
+                       <Users className="size-8 mx-auto text-muted-foreground/20" />
+                       <p className="mt-2 text-sm font-bold text-muted-foreground/50">Aucun compte ne correspond à votre recherche</p>
+                    </td>
+                  </tr>
                 ) : (
-                  users.map((user) => (
+                  filteredUsers.map((user) => (
                     <tr key={user.id} className="hover:bg-muted/30 transition-colors group">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">

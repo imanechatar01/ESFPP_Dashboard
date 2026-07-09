@@ -97,6 +97,7 @@ router.post('/replace', async (req, res) => {
 // GET /api/formateurs/:id/unites
 router.get('/:id/unites', async (req, res) => {
   const { id } = req.params;
+  const { filiere_id, classe_id, niveau_id } = req.query;
 
   try {
     // 1. Get all units for this formateur
@@ -112,8 +113,10 @@ router.get('/:id/unites', async (req, res) => {
         logigramme_id,
         logigramme:logigrammes (
           id,
-          filiere:filieres (code, name),
-          classe:classes (label)
+          filiere_id,
+          classe_id,
+          filiere:filieres (code, name, niveau),
+          classe:classes (label, annee)
         ),
         cells:week_cells (
           id,
@@ -129,8 +132,50 @@ router.get('/:id/unites', async (req, res) => {
 
     if (unitsError) throw unitsError;
 
+    // Debug: Log what we actually got
+    if (units.length > 0) {
+      console.log('[FormateursAPI] First unit structure:', JSON.stringify(units[0], null, 2));
+    }
+
+    // Apply client-side filtering based on query parameters
+    let filteredUnits = units;
+    
+    console.log('[FormateursAPI] Filtering with params:', { filiere_id, classe_id, niveau_id });
+    console.log('[FormateursAPI] Total units before filter:', units.length);
+
+    if (niveau_id) {
+      filteredUnits = filteredUnits.filter(u => {
+        const match = u.logigramme?.filiere?.niveau === niveau_id;
+        if (!match && units.length > 0) {
+          console.log('[FormateursAPI] Unit niveau check:', {
+            niveau_value: u.logigramme?.filiere?.niveau,
+            niveau_id_param: niveau_id,
+            match
+          });
+        }
+        return match;
+      });
+      console.log('[FormateursAPI] After niveau filter:', filteredUnits.length);
+    }
+    if (filiere_id) {
+      filteredUnits = filteredUnits.filter(u => {
+        const match = String(u.logigramme?.filiere_id) === String(filiere_id);
+        return match;
+      });
+      console.log('[FormateursAPI] After filiere filter:', filteredUnits.length);
+    }
+    if (classe_id) {
+      filteredUnits = filteredUnits.filter(u => {
+        const match = String(u.logigramme?.classe_id) === String(classe_id);
+        return match;
+      });
+      console.log('[FormateursAPI] After classe filter:', filteredUnits.length);
+    }
+
+    console.log('[FormateursAPI] Final filtered units:', filteredUnits.length);
+
     // 2. Process units: flatten completion, compute vh_realise (same logic as logigrammes.js)
-    const processedUnits = units.map(u => {
+    const processedUnits = filteredUnits.map(u => {
       const processedCells = u.cells.map(c => ({
         ...c,
         completion_status: c.completion?.status || 'pending'

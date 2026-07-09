@@ -10,7 +10,8 @@ import {
   X, 
   Loader2,
   CheckCircle2,
-  CalendarDays
+  CalendarDays,
+  Search
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -30,6 +31,7 @@ export default function FilieresManagement({ path, navigate }) {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [editingFiliere, setEditingFiliere] = useState(null)
   const [filiereToDelete, setFiliereToDelete] = useState(null)
+  const [searchQuery, setSearchQuery] = useState("")
   
   const [formData, setFormData] = useState({
     name: "",
@@ -128,6 +130,16 @@ export default function FilieresManagement({ path, navigate }) {
       .slice(0, 5)
   }
 
+  // Filter filieres based on search query
+  const filteredFilieres = filieres.filter((filiere) => {
+    const query = searchQuery.toLowerCase()
+    return (
+      filiere.name.toLowerCase().includes(query) ||
+      filiere.code.toLowerCase().includes(query) ||
+      filiere.niveau.toLowerCase().includes(query)
+    )
+  })
+
   return (
     <DashboardShell
       title="Gestion des Filières"
@@ -136,7 +148,17 @@ export default function FilieresManagement({ path, navigate }) {
       activePath={path}
       navigate={navigate}
     >
-      <div className="flex justify-end mb-6">
+      <div className="flex flex-col sm:flex-row gap-4 justify-between mb-6 items-start sm:items-center">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Rechercher par nom, code ou niveau..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 rounded-xl"
+          />
+        </div>
         <Button onClick={() => handleOpenModal()} className="rounded-xl font-bold uppercase tracking-widest text-xs">
           <Plus className="size-4 mr-2" />
           Nouvelle filière
@@ -166,8 +188,14 @@ export default function FilieresManagement({ path, navigate }) {
                   Aucune filière configurée
                 </td>
               </tr>
+            ) : filteredFilieres.length === 0 ? (
+              <tr>
+                <td colSpan="4" className="px-6 py-12 text-center text-sm font-bold text-muted-foreground/50 uppercase tracking-widest">
+                  Aucune filière ne correspond à votre recherche
+                </td>
+              </tr>
             ) : (
-              filieres.map((filiere) => (
+              filteredFilieres.map((filiere) => (
                 <tr key={filiere.id} className="group hover:bg-muted/30 transition-colors">
                   <td className="px-6 py-4">
                     <span className="inline-flex items-center justify-center px-2.5 py-1 rounded-md bg-primary/10 text-primary text-[11px] font-black tracking-wider">

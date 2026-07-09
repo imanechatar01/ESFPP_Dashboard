@@ -31,6 +31,7 @@ export default function FormateursManagement({ path, navigate }) {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isReplaceModalOpen, setIsReplaceModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
   
   const [editingFormateur, setEditingFormateur] = useState(null)
   const [formateurToDelete, setFormateurToDelete] = useState(null)
@@ -144,6 +145,15 @@ export default function FormateursManagement({ path, navigate }) {
     }
   }
 
+  // Filter formateurs based on search query
+  const filteredFormateurs = formateurs.filter((formateur) => {
+    const query = searchQuery.toLowerCase()
+    return (
+      formateur.nom.toLowerCase().includes(query) ||
+      formateur.statut.toLowerCase().includes(query)
+    )
+  })
+
   return (
     <DashboardShell
       title="Gestion des Formateurs"
@@ -152,7 +162,17 @@ export default function FormateursManagement({ path, navigate }) {
       activePath={path}
       navigate={navigate}
     >
-      <div className="flex justify-end mb-6">
+      <div className="flex flex-col sm:flex-row gap-4 justify-between mb-6 items-start sm:items-center">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Rechercher par nom ou statut..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 rounded-xl"
+          />
+        </div>
         <Button onClick={() => handleOpenModal()} className="rounded-xl font-bold uppercase tracking-widest text-xs">
           <Plus className="size-4 mr-2" />
           Nouveau formateur
@@ -181,8 +201,14 @@ export default function FormateursManagement({ path, navigate }) {
                   Aucun formateur trouvé
                 </td>
               </tr>
+            ) : filteredFormateurs.length === 0 ? (
+              <tr>
+                <td colSpan="3" className="px-6 py-12 text-center text-sm font-bold text-muted-foreground/50 uppercase tracking-widest">
+                  Aucun formateur ne correspond à votre recherche
+                </td>
+              </tr>
             ) : (
-              formateurs.map((formateur) => (
+              filteredFormateurs.map((formateur) => (
                 <tr key={formateur.id} className="group hover:bg-muted/30 transition-colors">
                   <td className="px-6 py-4">
                     <p className="text-sm font-black text-foreground">{formateur.nom}</p>

@@ -15,10 +15,21 @@ export function FormateurVue({ formateurId }) {
   const fetchFormateurData = async () => {
     if (!formateurId) return;
     try {
+      // Build query parameters with all filters
+      const queryParams = new URLSearchParams();
+      if (filters.niveau_id) queryParams.append('niveau_id', filters.niveau_id);
+      if (filters.filiere_id) queryParams.append('filiere_id', filters.filiere_id);
+      if (filters.classe_id) queryParams.append('classe_id', filters.classe_id);
+
+      const url = `/api/formateurs/${formateurId}/unites?${queryParams.toString()}`;
+      console.log('[FormateurVue] Fetching with URL:', url);
+      console.log('[FormateurVue] Current filters:', filters);
+
       const [res, weeksRes] = await Promise.all([
-        apiRequest(`/api/formateurs/${formateurId}/unites`),
+        apiRequest(url),
         apiRequest(`/api/years/${filters.year_id}/weeks`)
       ]);
+      console.log('[FormateurVue] Response:', res);
       setData(res);
       setWeeks(weeksRes);
     } catch (err) {
@@ -33,7 +44,7 @@ export function FormateurVue({ formateurId }) {
       setLoading(false);
     }
     init();
-  }, [formateurId, filters.year_id]);
+  }, [formateurId, filters.year_id, filters.niveau_id, filters.filiere_id, filters.classe_id]);
 
   if (loading && (!data || !weeks)) {
     return (
