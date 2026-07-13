@@ -1,10 +1,32 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiRequest } from '../lib/api';
+import { supabase } from '../supabaseClient';
+
+const calculateUnitMetrics = (unit) => {
+  const cells = unit?.cells || [];
+  const plannedHours = cells
+    .filter(c => c.cell_type === 'normal')
+    .reduce((sum, c) => sum + (parseFloat(c.heures) || 0), 0);
+
+  const effectiveVhg = plannedHours > 0 ? plannedHours : (parseFloat(unit?.vhg) || 0);
+  const vh_realise = cells
+    .filter(c => c.cell_type === 'normal' && (c.completion_status === 'done' || c.completion_status === 'auto_done'))
+    .reduce((sum, c) => sum + (parseFloat(c.heures) || 0), 0);
+
+  return {
+    ...unit,
+    vhg: effectiveVhg,
+    vh_realise,
+    vh_restant: effectiveVhg - vh_realise,
+    taux: effectiveVhg > 0 ? vh_realise / effectiveVhg : 0,
+  };
+};
 
 export function useLogigramme(logigrammeId) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const subscriptionRef = useRef(null);
 
   const fetchLogigramme = useCallback(async () => {
     if (!logigrammeId) return;
@@ -27,7 +49,10 @@ export function useLogigramme(logigrammeId) {
       if (totalCells === 0 && (res.unites?.length ?? 0) > 0) {
         console.warn('[useLogigramme] ⚠ Unités exist but ALL have ZERO cells — import may have failed silently!');
       }
-      setData(res);
+      setData({
+        ...res,
+        unites: (res.unites || []).map(calculateUnitMetrics),
+      });
     } catch (err) {
       console.error(`[useLogigramme] Error fetching id=${logigrammeId}:`, err.message);
       setError(err.message);
@@ -36,9 +61,68 @@ export function useLogigramme(logigrammeId) {
     }
   }, [logigrammeId]);
 
+  // Set up real-time subscriptions for changes
   useEffect(() => {
+    if (!logigrammeId) return;
+
+    // Initial fetch
     fetchLogigramme();
-  }, [fetchLogigramme]);
+
+    // Subscribe to changes on week_cells table for this logigramme
+    const channel = supabase
+      .channel(`logigramme:${logigrammeId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'week_cells',
+          filter: `logigramme_id=eq.${logigrammeId}`,
+        },
+        (payload) => {
+          console.log('[useLogigramme] Real-time update received:', payload);
+          // Update state with new/modified cell
+          setData(prev => {
+            if (!prev) return prev;
+
+            const affectedUniteId = payload.new?.unite_id || payload.old?.unite_id;
+            const nextUnites = prev.unites.map(u => {
+              if (u.id !== affectedUniteId) return u;
+
+              let nextCells;
+              if (payload.eventType === 'DELETE') {
+                // Remove deleted cell
+                nextCells = u.cells.filter(c => c.id !== payload.old.id);
+              } else {
+                // INSERT or UPDATE
+                const existingIndex = u.cells.findIndex(c => c.id === payload.new.id);
+                if (existingIndex >= 0) {
+                  nextCells = [...u.cells];
+                  nextCells[existingIndex] = payload.new;
+                } else {
+                  nextCells = [...u.cells, payload.new];
+                }
+              }
+
+              return calculateUnitMetrics({ ...u, cells: nextCells });
+            });
+
+            return { ...prev, unites: nextUnites };
+          });
+        }
+      )
+      .subscribe();
+
+    subscriptionRef.current = channel;
+
+    // Cleanup: unsubscribe on unmount or when logigrammeId changes
+    return () => {
+      if (subscriptionRef.current) {
+        supabase.removeChannel(subscriptionRef.current);
+        subscriptionRef.current = null;
+      }
+    };
+  }, [logigrammeId]);
 
   const toggleCell = async (cellId, currentStatus) => {
     // 'done' and 'auto_done' both show the checkmark — toggling either sets to 'pending'
@@ -52,17 +136,7 @@ export function useLogigramme(logigrammeId) {
         const nextCells = u.cells.map(c =>
           c.id === cellId ? { ...c, completion_status: nextStatus } : c
         );
-        // Recalculate vh_realise for this unite so progress bar updates instantly
-        const vh_realise = nextCells
-          .filter(c => c.cell_type === 'normal' && (c.completion_status === 'done' || c.completion_status === 'auto_done'))
-          .reduce((sum, c) => sum + (parseFloat(c.heures) || 0), 0);
-        return {
-          ...u,
-          cells: nextCells,
-          vh_realise,
-          vh_restant: u.vhg - vh_realise,
-          taux: u.vhg > 0 ? vh_realise / u.vhg : 0,
-        };
+        return calculateUnitMetrics({ ...u, cells: nextCells });
       });
       return { ...prev, unites: nextUnites };
     });
@@ -131,18 +205,7 @@ export function useLogigramme(logigrammeId) {
           nextCells = [...u.cells, optimisticCell];
         }
 
-        // Recalculate vh_realise
-        const vh_realise = nextCells
-          .filter(c => c.cell_type === 'normal' && (c.completion_status === 'done' || c.completion_status === 'auto_done'))
-          .reduce((sum, c) => sum + (parseFloat(c.heures) || 0), 0);
-        
-        return {
-          ...u,
-          cells: nextCells,
-          vh_realise,
-          vh_restant: u.vhg - vh_realise,
-          taux: u.vhg > 0 ? vh_realise / u.vhg : 0,
-        };
+        return calculateUnitMetrics({ ...u, cells: nextCells });
       });
       return { ...prev, unites: nextUnites };
     });
@@ -190,16 +253,7 @@ export function useLogigramme(logigrammeId) {
             nextCells = u.cells.filter(c => c.id !== tempId);
           }
           
-          const vh_realise = nextCells
-            .filter(c => c.cell_type === 'normal' && (c.completion_status === 'done' || c.completion_status === 'auto_done'))
-            .reduce((sum, c) => sum + (parseFloat(c.heures) || 0), 0);
-          return {
-            ...u,
-            cells: nextCells,
-            vh_realise,
-            vh_restant: u.vhg - vh_realise,
-            taux: u.vhg > 0 ? vh_realise / u.vhg : 0,
-          };
+          return calculateUnitMetrics({ ...u, cells: nextCells });
         });
         return { ...prev, unites: nextUnites };
       });

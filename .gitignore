@@ -8,8 +8,6 @@ pnpm-debug.log*
 lerna-debug.log*
 
 
-/PROJECT_FILES_DUMP.md
-/TECHNOLOGY_GUIDE.md
 /backend/scripts1
 /backend/node_modules
 /backend/import-reports/
@@ -32,3 +30,6 @@ dist-ssr
 *.sw?
 
 .env
+GEMINI.md
+HANDOFF.md
+

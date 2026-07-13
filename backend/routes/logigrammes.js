@@ -41,6 +41,26 @@ async function getCurrentYearId() {
   return data.id;
 }
 
+function calculateUnitMetrics(unit) {
+  const cells = unit?.cells || [];
+  const plannedHours = cells
+    .filter(c => c.cell_type === 'normal')
+    .reduce((sum, c) => sum + (parseFloat(c.heures) || 0), 0);
+
+  const effectiveVhg = plannedHours > 0 ? plannedHours : (parseFloat(unit?.vhg) || 0);
+  const vh_realise = cells
+    .filter(c => c.cell_type === 'normal' && (c.completion_status === 'done' || c.completion_status === 'auto_done'))
+    .reduce((sum, c) => sum + (parseFloat(c.heures) || 0), 0);
+
+  return {
+    ...unit,
+    vhg: effectiveVhg,
+    vh_realise,
+    vh_restant: effectiveVhg - vh_realise,
+    taux: effectiveVhg > 0 ? vh_realise / effectiveVhg : 0,
+  };
+}
+
 // GET /api/logigramme/kpis
 router.get('/kpis', async (req, res) => {
   let { year_id, filiere_id, formateur_id } = req.query;
@@ -101,9 +121,11 @@ router.get('/kpis', async (req, res) => {
     for (const unit of units) {
       uniqueLogIds.add(unit.logigramme_id);
       if (unit.formateur_id) uniqueFormateurIds.add(unit.formateur_id);
-      totalVhg += (parseFloat(unit.vhg) || 0);
 
-      const cells = unit.cells || [];
+      const metricUnit = calculateUnitMetrics(unit);
+      totalVhg += metricUnit.vhg;
+
+      const cells = metricUnit.cells || [];
       for (const cell of cells) {
         if (cell.cell_type === 'normal') {
           let status = cell.completion?.status;
@@ -306,16 +328,11 @@ router.get('/:id', async (req, res) => {
         };
       });
 
-      const vh_realise = processedCells
-        .filter(c => c.cell_type === 'normal' && (c.completion_status === 'done' || c.completion_status === 'auto_done'))
-        .reduce((sum, c) => sum + (parseFloat(c.heures) || 0), 0);
+      const metricUnit = calculateUnitMetrics({ ...u, cells: processedCells });
 
       return {
-        ...u,
+        ...metricUnit,
         cells: processedCells,
-        vh_realise,
-        vh_restant: u.vhg - vh_realise,
-        taux: u.vhg > 0 ? vh_realise / u.vhg : 0
       };
     });
 

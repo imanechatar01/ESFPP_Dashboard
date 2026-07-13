@@ -6,6 +6,26 @@ import { GridRow } from './GridRow';
 import { Legend } from './Legend';
 import { Loader2, AlertTriangle, Info } from 'lucide-react';
 
+const calculateUnitMetrics = (unit) => {
+  const cells = unit?.cells || [];
+  const plannedHours = cells
+    .filter(c => c.cell_type === 'normal')
+    .reduce((sum, c) => sum + (parseFloat(c.heures) || 0), 0);
+
+  const effectiveVhg = plannedHours > 0 ? plannedHours : (parseFloat(unit?.vhg) || 0);
+  const vh_realise = cells
+    .filter(c => c.cell_type === 'normal' && (c.completion_status === 'done' || c.completion_status === 'auto_done'))
+    .reduce((sum, c) => sum + (parseFloat(c.heures) || 0), 0);
+
+  return {
+    ...unit,
+    vhg: effectiveVhg,
+    vh_realise,
+    vh_restant: effectiveVhg - vh_realise,
+    taux: effectiveVhg > 0 ? vh_realise / effectiveVhg : 0,
+  };
+};
+
 export function FormateurVue({ formateurId }) {
   const { filters } = useLogigrammeContext();
   const [data, setData] = useState(null);
@@ -30,7 +50,10 @@ export function FormateurVue({ formateurId }) {
         apiRequest(`/api/years/${filters.year_id}/weeks`)
       ]);
       console.log('[FormateurVue] Response:', res);
-      setData(res);
+      setData({
+        ...res,
+        unites: (res.unites || []).map(calculateUnitMetrics),
+      });
       setWeeks(weeksRes);
     } catch (err) {
       console.error('Failed to fetch formateur data:', err);
@@ -90,18 +113,7 @@ export function FormateurVue({ formateurId }) {
           c.id === cellId ? { ...c, completion_status: nextStatus } : c
         );
 
-        // Recalculate vh_realise
-        const vh_realise = nextCells
-          .filter(c => c.cell_type === 'normal' && (c.completion_status === 'done' || c.completion_status === 'auto_done'))
-          .reduce((sum, c) => sum + (parseFloat(c.heures) || 0), 0);
-
-        return {
-          ...u,
-          cells: nextCells,
-          vh_realise,
-          vh_restant: u.vhg - vh_realise,
-          taux: u.vhg > 0 ? vh_realise / u.vhg : 0,
-        };
+        return calculateUnitMetrics({ ...u, cells: nextCells });
       });
       return { ...prev, unites: nextUnites };
     });
@@ -177,16 +189,7 @@ export function FormateurVue({ formateurId }) {
           nextCells = [...u.cells, optimisticCell];
         }
 
-        const vh_realise = nextCells
-          .filter(c => c.cell_type === 'normal' && (c.completion_status === 'done' || c.completion_status === 'auto_done'))
-          .reduce((sum, c) => sum + (parseFloat(c.heures) || 0), 0);
-        return {
-          ...u,
-          cells: nextCells,
-          vh_realise,
-          vh_restant: u.vhg - vh_realise,
-          taux: u.vhg > 0 ? vh_realise / u.vhg : 0,
-        };
+        return calculateUnitMetrics({ ...u, cells: nextCells });
       });
       return { ...prev, unites: nextUnites };
     });
@@ -216,16 +219,7 @@ export function FormateurVue({ formateurId }) {
           } else {
             nextCells = u.cells.filter(c => c.id !== tempId);
           }
-          const vh_realise = nextCells
-            .filter(c => c.cell_type === 'normal' && (c.completion_status === 'done' || c.completion_status === 'auto_done'))
-            .reduce((sum, c) => sum + (parseFloat(c.heures) || 0), 0);
-          return {
-            ...u,
-            cells: nextCells,
-            vh_realise,
-            vh_restant: u.vhg - vh_realise,
-            taux: u.vhg > 0 ? vh_realise / u.vhg : 0,
-          };
+          return calculateUnitMetrics({ ...u, cells: nextCells });
         });
         return { ...prev, unites: nextUnites };
       });
