@@ -24,6 +24,10 @@ export function GridCell({ cell, semaine, onToggle, onCreateCell, isHighlighted 
   }, [hasError]);
 
   const isExistingNormal = cell && cell.cell_type === 'normal';
+  const displayHeures = isExistingNormal && cell.heures !== null && cell.heures !== undefined
+    ? Math.round(Number(cell.heures))
+    : null;
+  const displayHeuresLabel = displayHeures !== null ? `${displayHeures}` : '';
 
   const handleContextMenu = (e) => {
     e.preventDefault();
@@ -34,12 +38,23 @@ export function GridCell({ cell, semaine, onToggle, onCreateCell, isHighlighted 
 
   const commitValue = (value) => {
     setIsEditing(false);
-    const numVal = parseFloat(value);
-    if (!numVal || numVal <= 0) return; // Ignore empty or invalid
+    const rawValue = String(value ?? '').trim();
+
+    if (rawValue === '') {
+      if (isExistingNormal && onCreateCell) {
+        onCreateCell(semaine, null).catch(() => {
+          setHasError(true);
+        });
+      }
+      return;
+    }
+
+    const numVal = Number(rawValue);
+    if (!Number.isFinite(numVal) || numVal < 0) return;
 
     if (onCreateCell) {
       // If it hasn't changed from existing value, we could skip, but let's just save
-      if (isExistingNormal && numVal === cell.heures) return;
+      if (isExistingNormal && numVal === Number(cell.heures)) return;
       
       onCreateCell(semaine, numVal).catch(() => {
         setHasError(true);
@@ -68,7 +83,7 @@ export function GridCell({ cell, semaine, onToggle, onCreateCell, isHighlighted 
         <input
           ref={inputRef}
           type="number"
-          min="1"
+          min="0"
           step="1"
           defaultValue={isExistingNormal ? cell.heures : undefined}
           className="w-8 h-8 text-center text-[11px] font-bold bg-transparent border-b-2 border-slate-400 outline-none appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -113,7 +128,7 @@ export function GridCell({ cell, semaine, onToggle, onCreateCell, isHighlighted 
         isHighlighted && "ring-2 ring-destructive ring-inset z-20 shadow-[0_0_8px_rgba(239,68,68,0.4)]",
         hasError && "ring-2 ring-red-500 ring-inset z-20"
       )}
-      title={isHighlighted ? "CONFLIT D'HORAIRE ! " + (isNormal ? `${heures}h` : cell_type) : (isNormal ? `${heures}h - ${completion_status}` : cell_type)}
+      title={isHighlighted ? "CONFLIT D'HORAIRE ! " + (isNormal ? `${displayHeuresLabel}h` : cell_type) : (isNormal ? `${displayHeuresLabel}h - ${completion_status}` : cell_type)}
     >
       {cell_type === 'vacation' && 'V'}
       {cell_type === 'exam' && (
@@ -125,7 +140,7 @@ export function GridCell({ cell, semaine, onToggle, onCreateCell, isHighlighted 
       {cell_type === 'tiff' && 'T'}
       {isNormal && (
         <>
-          <span>{heures > 0 ? Math.round(heures) : ''}</span>
+          <span>{displayHeures !== null ? displayHeures : ''}</span>
           {isDone && <span className="absolute top-0.5 right-0.5 text-[8px] font-bold text-emerald-600">✔</span>}
         </>
       )}

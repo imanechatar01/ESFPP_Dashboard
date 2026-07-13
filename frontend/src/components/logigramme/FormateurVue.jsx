@@ -153,12 +153,19 @@ export function FormateurVue({ formateurId }) {
         if (existingCellIndex >= 0) {
           isUpdate = true;
           oldCell = u.cells[existingCellIndex];
-          nextCells = [...u.cells];
-          nextCells[existingCellIndex] = {
-            ...oldCell,
-            heures,
-          };
+          if (heures === null || heures === undefined) {
+            nextCells = u.cells.filter(c => c.semaine !== semaine);
+          } else {
+            nextCells = [...u.cells];
+            nextCells[existingCellIndex] = {
+              ...oldCell,
+              heures,
+            };
+          }
         } else {
+          if (heures === null || heures === undefined) {
+            return u;
+          }
           const optimisticCell = {
             id: tempId,
             semaine,

@@ -358,6 +358,13 @@ router.post('/cell', async (req, res) => {
   }
 
   try {
+    const hasHeures = heures !== undefined && heures !== null && String(heures).trim() !== '';
+    const numericHeures = hasHeures ? Number(heures) : null;
+
+    if (hasHeures && (!Number.isFinite(numericHeures) || numericHeures < 0)) {
+      return res.status(400).json({ error: 'heures doit être un nombre positif ou nul.' });
+    }
+
     // 1. Resolve academic_year_id via the unite's logigramme
     const { data: unite, error: uniteError } = await supabaseAdmin
       .from('unites_formation')
@@ -383,6 +390,21 @@ router.post('/cell', async (req, res) => {
       return res.status(404).json({ error: `Semaine ${semaine} introuvable pour cette année académique.` });
     }
 
+    if (!hasHeures) {
+      const { data: deletedCell, error: deleteError } = await supabaseAdmin
+        .from('week_cells')
+        .delete()
+        .eq('unite_id', unite_id)
+        .eq('semaine', semaine)
+        .select()
+        .single();
+
+      if (deleteError && deleteError.code !== 'PGRST116') throw deleteError;
+
+      console.log(`[logigramme] Deleted cell: unite=${unite_id}, semaine=${semaine}`);
+      return res.json({ success: true, deleted: !!deletedCell });
+    }
+
     // 3. Upsert into week_cells
     const { data: cell, error: cellError } = await supabaseAdmin
       .from('week_cells')
@@ -390,7 +412,7 @@ router.post('/cell', async (req, res) => {
         unite_id,
         semaine,
         cell_type: cell_type || 'normal',
-        heures: (Number.isFinite(Number(heures)) && Number(heures) > 0) ? Number(heures) : null,
+        heures: numericHeures,
         week_start_date: weekRow.week_start_date
       }, { onConflict: 'unite_id, semaine' })
       .select()
@@ -398,7 +420,7 @@ router.post('/cell', async (req, res) => {
 
     if (cellError) throw cellError;
 
-    console.log(`[logigramme] Upserted cell: unite=${unite_id}, semaine=${semaine}, heures=${heures}`);
+    console.log(`[logigramme] Upserted cell: unite=${unite_id}, semaine=${semaine}, heures=${numericHeures}`);
     res.json(cell);
   } catch (err) {
     console.error('[logigramme] Cell upsert error:', err);

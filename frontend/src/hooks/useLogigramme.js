@@ -106,13 +106,20 @@ export function useLogigramme(logigrammeId) {
         if (existingCellIndex >= 0) {
           isUpdate = true;
           oldCell = u.cells[existingCellIndex];
-          nextCells = [...u.cells];
-          nextCells[existingCellIndex] = {
-            ...oldCell,
-            heures,
-            // Keep existing ID so toggle still works while saving
-          };
+          if (heures === null || heures === undefined) {
+            nextCells = u.cells.filter(c => c.semaine !== semaine);
+          } else {
+            nextCells = [...u.cells];
+            nextCells[existingCellIndex] = {
+              ...oldCell,
+              heures,
+              // Keep existing ID so toggle still works while saving
+            };
+          }
         } else {
+          if (heures === null || heures === undefined) {
+            return u;
+          }
           const optimisticCell = {
             id: tempId,
             semaine,
@@ -152,7 +159,7 @@ export function useLogigramme(logigrammeId) {
       });
 
       // If it was a new cell, replace temporary cell with real DB cell (update the id)
-      if (!isUpdate) {
+      if (!isUpdate && heures !== null && heures !== undefined) {
         setData(prev => {
           if (!prev) return prev;
           const nextUnites = prev.unites.map(u => {
