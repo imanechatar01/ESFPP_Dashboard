@@ -30,6 +30,7 @@ dist-ssr
 *.sw?
 
 .env
-!GEMINI.md
-!HANDOFF.md
+#ignoring the .md file except the readme.md :
+*.md
+!README.md
 
