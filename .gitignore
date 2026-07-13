@@ -30,6 +30,6 @@ dist-ssr
 *.sw?
 
 .env
-GEMINI.md
-HANDOFF.md
+!GEMINI.md
+!HANDOFF.md
 
