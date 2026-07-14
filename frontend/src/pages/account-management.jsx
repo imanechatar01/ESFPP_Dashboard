@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react"
 
 
-=======
+
 import { Activity, Check, Loader2, Mail, MailPlus, RefreshCw, Users, UserPlus, Shield, User, CalendarDays } from "lucide-react"
 
 import { DashboardShell } from "@/components/layout/dashboard-shell"
@@ -184,19 +184,7 @@ export function AccountManagement({ path, navigate }) {
         </section>
 
         {/* Users table */}
-<<<<<<< HEAD
-        <section className="rounded-2xl border border-border bg-card p-6 shadow-sm medical-glass">
-          <div className="flex flex-col gap-4 mb-8">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-accent/10">
-                  <Users className="size-5 text-accent" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold tracking-tight">Annuaire des comptes</h2>
-                  <p className="text-xs text-muted-foreground font-medium">{users.length} utilisateurs enregistrés</p>
-                </div>
-=======
+
         <section className="min-w-0 rounded-2xl border border-border bg-card p-6 shadow-sm medical-glass">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
             <div className="flex items-center gap-3">
@@ -206,7 +194,7 @@ export function AccountManagement({ path, navigate }) {
               <div>
                 <h2 className="text-lg font-bold tracking-tight">Annuaire des comptes</h2>
                 <p className="text-xs text-muted-foreground font-medium">{users.length} utilisateurs enregistrés</p>
->>>>>>> origin/main
+
               </div>
               <Button 
                 type="button" 
