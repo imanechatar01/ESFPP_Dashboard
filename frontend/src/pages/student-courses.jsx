@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react"
 import { Play, Loader2, Video, Search, BookOpen, X } from "lucide-react"
 import { DashboardShell } from "@/components/layout/dashboard-shell"
+import CourseVideoPlayer from "@/components/ui/CourseVideoPlayer"
+import CourseCardPreview from "@/components/ui/CourseCardPreview"
 import { apiRequest } from "@/lib/api"
 import { useAuth } from "@/contexts/auth-context"
 import { cn } from "@/lib/utils"
@@ -9,50 +11,6 @@ const navItems = [
   { label: "Mon espace", path: "/student/dashboard", icon: BookOpen },
 ]
 
-function getEmbedInfo(url) {
-  if (!url) return null;
-  
-  // YouTube RegExp
-  const ytRegExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-  const ytMatch = url.match(ytRegExp);
-  if (ytMatch && ytMatch[2].length === 11) {
-    return { type: 'iframe', url: `https://www.youtube.com/embed/${ytMatch[2]}` };
-  }
-  
-  // Vimeo RegExp
-  const vimeoRegExp = /vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/([^\/]*)\/videos\/|album\/(\d+)\/video\/|video\/|)(\d+)(?:$|\/|\?)/;
-  const vimeoMatch = url.match(vimeoRegExp);
-  if (vimeoMatch && vimeoMatch[3]) {
-    return { type: 'iframe', url: `https://player.vimeo.com/video/${vimeoMatch[3]}` };
-  }
-  
-  // Standard video file
-  if (url.match(/\.(mp4|webm|ogg)$/i) || url.includes("drive.google.com/file")) {
-    // If it is google drive link, replace standard view link with preview link
-    let finalUrl = url;
-    if (url.includes("drive.google.com/file/d/")) {
-      const match = url.match(/\/file\/d\/([^\/]+)/);
-      if (match && match[1]) {
-        finalUrl = `https://drive.google.com/file/d/${match[1]}/preview`;
-        return { type: 'iframe', url: finalUrl };
-      }
-    }
-    return { type: 'video', url: finalUrl };
-  }
-  
-  // Fallback as iframe
-  return { type: 'iframe', url };
-}
-
-function getThumbnailUrl(url) {
-  if (!url) return null;
-  const ytRegExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-  const ytMatch = url.match(ytRegExp);
-  if (ytMatch && ytMatch[2].length === 11) {
-    return `https://img.youtube.com/vi/${ytMatch[2]}/mqdefault.jpg`;
-  }
-  return null;
-}
 
 export function StudentCourses({ path, navigate }) {
   const { user } = useAuth()
@@ -118,7 +76,7 @@ export function StudentCourses({ path, navigate }) {
     return matchesSearch && matchesFiliere && matchesClasse
   })
 
-  const videoInfo = activeVideo ? getEmbedInfo(activeVideo.video_url) : null;
+
 
   return (
     <DashboardShell
@@ -203,24 +161,7 @@ export function StudentCourses({ path, navigate }) {
                 >
                   {/* Card visual header */}
                   <div className="relative aspect-video bg-muted flex items-center justify-center border-b border-border/50 overflow-hidden">
-                    {getThumbnailUrl(course.video_url) ? (
-                      <img 
-                        src={getThumbnailUrl(course.video_url)} 
-                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
-                        alt={course.title}
-                      />
-                    ) : course.video_url.match(/\.(mp4|webm|ogg)$/i) ? (
-                      <video 
-                        src={course.video_url} 
-                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                        preload="metadata"
-                        muted
-                      />
-                    ) : (
-                      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-accent/5 to-secondary/15 flex items-center justify-center">
-                        <Video className="size-8 text-primary/30" />
-                      </div>
-                    )}
+                    <CourseCardPreview videoUrl={course.video_url} title={course.title} />
 
                     <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/10 to-transparent" />
                     
@@ -265,7 +206,7 @@ export function StudentCourses({ path, navigate }) {
       </div>
 
       {/* Video Player Modal */}
-      {activeVideo && videoInfo && (
+      {activeVideo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
           <div className="relative w-full max-w-4xl rounded-2xl border border-white/10 bg-card overflow-hidden shadow-2xl flex flex-col medical-glass">
             
@@ -287,23 +228,7 @@ export function StudentCourses({ path, navigate }) {
             </div>
 
             {/* Video Player Box */}
-            <div className="relative aspect-video w-full bg-black">
-              {videoInfo.type === 'iframe' ? (
-                <iframe
-                  src={videoInfo.url}
-                  className="absolute inset-0 w-full h-full border-0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowFullScreen
-                />
-              ) : (
-                <video
-                  src={videoInfo.url}
-                  controls
-                  autoPlay
-                  className="absolute inset-0 w-full h-full"
-                />
-              )}
-            </div>
+            <CourseVideoPlayer videoUrl={activeVideo.video_url} />
 
             {/* Modal Info Footer */}
             {activeVideo.description && (
