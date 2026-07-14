@@ -15,7 +15,7 @@ dotenv.config()
 
 const app = express()
 
-const PORT = process.env.PORT || 3000
+const PORT = process.env.PORT || 3001
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173"
 
 app.use(cors({ origin: FRONTEND_URL, credentials: true }))
@@ -58,24 +58,24 @@ app.use("/api/years", requireAuth, requireRole("admin"), yearsRouter)
 // ---------------------------------------------------------------------------
 
 app.get("/api/student/logigramme", requireAuth, async (req, res) => {
-    // Students can see logigrammes for their own filiere
-    // For now, let's just return what's available
-    try {
-        const { data, error } = await supabaseAdmin
-            .from('logigrammes')
-            .select(`
+  // Students can see logigrammes for their own filiere
+  // For now, let's just return what's available
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('logigrammes')
+      .select(`
                 id,
                 filiere:filieres (id, code, name),
                 classe:classes (id, label, annee),
                 academic_year:academic_years (label)
             `)
-            .eq('academic_years.is_current', true);
-        
-        if (error) throw error;
-        res.json(data);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+      .eq('academic_years.is_current', true);
+
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -148,26 +148,18 @@ app.post("/api/admin/invitations", requireServiceRole, requireAuth, requireRole(
     return res.status(400).json({ error: "Role must be admin or student" })
   }
 
-  // Generate invitation link instead of sending email
-  const { data, error } = await supabaseAdmin.auth.admin.generateLink({
-    type: "invite",
-    email,
-    options: {
-      redirectTo: `${FRONTEND_URL}/complete-account`,
-      data: { role },
-    },
+  // Send invitation email using Supabase Auth Admin API
+  const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+    redirectTo: `${FRONTEND_URL}/complete-account`,
+    data: { role },
   })
 
   if (error) {
+    console.error("inviteUserByEmail error:", JSON.stringify(error, null, 2))
     return res.status(400).json({ error: error.message })
   }
 
   const userId = data.user?.id
-  const inviteLink = data?.properties?.action_link
-
-  if (!inviteLink) {
-    return res.status(500).json({ error: "Supabase did not return an invitation link" })
-  }
 
   // Create profile row with status and role
   if (userId) {
@@ -182,7 +174,6 @@ app.post("/api/admin/invitations", requireServiceRole, requireAuth, requireRole(
     userId,
     email: data.user?.email || email,
     role,
-    inviteLink,
     status: "invited",
   })
 })
@@ -227,27 +218,17 @@ app.post("/api/admin/invitations/:userId/regenerate", requireServiceRole, requir
     return res.status(403).json({ error: "Account is blocked. Unblock the account before regenerating an invitation." })
   }
 
-  // Generate a fresh invitation link (always fresh, never trust old links)
-  const { data, error } = await supabaseAdmin.auth.admin.generateLink({
-    type: "invite",
-    email: targetUser.email,
-    options: {
-      redirectTo: `${FRONTEND_URL}/complete-account`,
-      data: { role: getRole(targetUser) },
-    },
+  // Send a fresh invitation email to the user
+  const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(targetUser.email, {
+    redirectTo: `${FRONTEND_URL}/complete-account`,
+    data: { role: getRole(targetUser) },
   })
 
   if (error) {
     return res.status(400).json({ error: error.message })
   }
 
-  const inviteLink = data?.properties?.action_link
-
-  if (!inviteLink) {
-    return res.status(500).json({ error: "Supabase did not return an invitation link" })
-  }
-
-  res.json({ inviteLink })
+  res.json({ message: "Invitation email resent successfully" })
 })
 
 // ---------------------------------------------------------------------------
@@ -327,6 +308,14 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: "Internal server error" })
 })
 
-app.listen(PORT, () => {
-  console.log(`Backend started on http://localhost:${PORT}`)
-})
+const server = app.listen(PORT);
+
+server.on('listening', () => {
+  console.log(`Backend started on http://localhost:${PORT}`);
+});
+
+server.on('error', (err) => {
+  console.error(`Failed to start server:`, err);
+  process.exit(1);
+});
+
