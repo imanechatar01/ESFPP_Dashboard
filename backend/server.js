@@ -135,6 +135,30 @@ app.get("/api/admin/users", requireServiceRole, requireAuth, requireRole("admin"
 })
 
 // ---------------------------------------------------------------------------
+// Admin — delete user
+// ---------------------------------------------------------------------------
+
+app.delete("/api/admin/users/:userId", requireServiceRole, requireAuth, requireRole("admin"), async (req, res) => {
+  const { userId } = req.params
+
+  if (userId === req.user.id) {
+    return res.status(400).json({ error: "Vous ne pouvez pas vous supprimer vous-même" })
+  }
+
+  try {
+    // Due to ON DELETE CASCADE on public.profiles references auth.users(id),
+    // deleting the auth user will automatically delete their profile.
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(userId)
+    if (error) throw error
+
+    res.json({ message: "Utilisateur supprimé avec succès" })
+  } catch (err) {
+    console.error("deleteUser error:", err.message)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ---------------------------------------------------------------------------
 // Admin — create invitation (generates link, does NOT send email)
 // ---------------------------------------------------------------------------
 
