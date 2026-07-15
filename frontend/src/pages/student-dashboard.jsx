@@ -35,7 +35,10 @@ export function StudentDashboard({ path, navigate }) {
             Bienvenue sur votre espace personnel ESFPP. Retrouvez ici vos cours, vos affectations de stage et votre suivi administratif.
           </p>
           <div className="mt-8 flex flex-wrap gap-4">
-            <button className="h-11 px-6 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-lg shadow-primary/20 transition-all hover:shadow-primary/30 flex items-center gap-2 group">
+            <button 
+              onClick={() => navigate('/student/courses')}
+              className="h-11 px-6 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-lg shadow-primary/20 transition-all hover:shadow-primary/30 flex items-center gap-2 group"
+            >
               Mes cours
               <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
             </button>
@@ -80,11 +83,18 @@ export function StudentDashboard({ path, navigate }) {
         <div className="grid gap-6">
           <section className="grid gap-4 sm:grid-cols-3">
             {[
-              { label: "Cours", icon: BookOpenCheck, value: "Modules S1", helper: "4 documents", color: "text-primary", bg: "bg-primary/10" },
+              { label: "Cours", icon: BookOpenCheck, value: "Modules S1", helper: "4 documents", color: "text-primary", bg: "bg-primary/10", path: "/student/courses" },
               { label: "Stages", icon: MapPin, value: "Non affecté", helper: "Dossier en cours", color: "text-accent", bg: "bg-accent/10" },
               { label: "Examens", icon: ClipboardList, value: "Session Janv.", helper: "Calendrier à venir", color: "text-secondary-foreground", bg: "bg-secondary" },
             ].map((card) => (
-              <div key={card.label} className="group cursor-pointer rounded-2xl border border-border bg-card p-5 transition-all hover:shadow-lg hover:-translate-y-1">
+              <div 
+                key={card.label} 
+                onClick={() => card.path && navigate(card.path)}
+                className={cn(
+                  "group cursor-pointer rounded-2xl border border-border bg-card p-5 transition-all hover:shadow-lg hover:-translate-y-1",
+                  !card.path && "pointer-events-none opacity-90"
+                )}
+              >
                 <div className={cn("flex size-10 items-center justify-center rounded-xl mb-4 transition-colors", card.bg)}>
                   <card.icon className={cn("size-5", card.color)} />
                 </div>

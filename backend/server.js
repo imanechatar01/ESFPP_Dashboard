@@ -10,6 +10,7 @@ import completionRouter from "./routes/completion.js"
 import filieresRouter from "./routes/filieres.js"
 import formateursRouter from "./routes/formateurs.js"
 import yearsRouter from "./routes/academic-years.js"
+import coursesRouter from "./routes/courses.js"
 
 dotenv.config()
 
@@ -49,9 +50,10 @@ app.get("/api/me", requireAuth, (req, res) => {
 
 app.use("/api/logigramme", requireAuth, requireRole("admin"), logigrammesRouter)
 app.use("/api/completion", requireAuth, requireRole("admin"), completionRouter)
-app.use("/api/filieres", requireAuth, requireRole("admin"), filieresRouter)
+app.use("/api/filieres", requireAuth, filieresRouter)
 app.use("/api/formateurs", requireAuth, requireRole("admin"), formateursRouter)
 app.use("/api/years", requireAuth, requireRole("admin"), yearsRouter)
+app.use("/api/courses", requireAuth, coursesRouter)
 
 // ---------------------------------------------------------------------------
 // Student — Read-only Logigramme

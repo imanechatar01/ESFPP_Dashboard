@@ -11,6 +11,8 @@ import { LogigrammeView } from "@/pages/logigramme-view"
 import FilieresManagement from "@/pages/filieres-management"
 import FormateursManagement from "@/pages/formateurs-management"
 import AcademicYears from "@/pages/academic-years"
+import { AdminCourses } from "@/pages/admin-courses"
+import { StudentCourses } from "@/pages/student-courses"
 import { LogigrammeProvider } from "@/contexts/logigramme-context"
 import { useCallback, useEffect, useState } from "react"
 
@@ -73,15 +75,17 @@ function AppRoutes() {
           {path === "/admin/filieres" && <FilieresManagement path={path} navigate={navigate} />}
           {path === "/admin/formateurs" && <FormateursManagement path={path} navigate={navigate} />}
           {path === "/admin/academic-years" && <AcademicYears path={path} navigate={navigate} />}
+          {path === "/admin/courses" && <AdminCourses path={path} navigate={navigate} />}
         </LogigrammeProvider>
       </RequireRole>
     )
   }
 
-  if (path === "/student/dashboard") {
+  if (path.startsWith("/student/")) {
     return (
       <RequireRole role="student" navigate={navigate}>
-        <StudentDashboard path={path} navigate={navigate} />
+        {path === "/student/dashboard" && <StudentDashboard path={path} navigate={navigate} />}
+        {path === "/student/courses" && <StudentCourses path={path} navigate={navigate} />}
       </RequireRole>
     )
   }
