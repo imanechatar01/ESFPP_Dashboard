@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { AlertTriangle, Loader2, UserCheck, ShieldCheck, UserCircle, KeyRound, ArrowRight } from "lucide-react"
+import { supabase } from "@/supabaseClient"
 import { AuthLayout } from "@/components/auth/auth-layout"
 import { PasswordInput } from "@/components/auth/password-input"
 import { Button } from "@/components/ui/button"
@@ -69,6 +70,9 @@ export function CompleteAccount({ navigate }) {
         method: "POST",
         body: JSON.stringify({ firstName, lastName, password }),
       })
+
+      // Refresh the local session to fetch the updated user metadata from DB
+      await supabase.auth.refreshSession()
 
       navigate(getDashboardPath(result.role || role), { replace: true })
     } catch (err) {

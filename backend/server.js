@@ -258,9 +258,30 @@ app.post("/api/admin/invitations/:userId/regenerate", requireServiceRole, requir
 })
 
 // ---------------------------------------------------------------------------
-// Admin — complete account from backend (used by /complete-account page)
-// This ensures status changes go through the backend, not directly from
-// the frontend anon client.
+// Admin — delete user
+// ---------------------------------------------------------------------------
+app.delete("/api/admin/users/:userId", requireServiceRole, requireAuth, requireRole("admin"), async (req, res) => {
+  const { userId } = req.params
+
+  try {
+    // Delete profile first to clean up foreign keys safely
+    await supabaseAdmin.from("profiles").delete().eq("id", userId)
+
+    // Delete user from Supabase Auth
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(userId)
+
+    if (error) {
+      console.error("deleteUser error:", error.message)
+      return res.status(500).json({ error: error.message })
+    }
+
+    res.json({ message: "User deleted successfully" })
+  } catch (err) {
+    console.error("Unexpected error in DELETE /api/admin/users:", err)
+    res.status(500).json({ error: "Internal server error" })
+  }
+})
+
 // ---------------------------------------------------------------------------
 
 app.post("/api/complete-account", requireAuth, async (req, res) => {
