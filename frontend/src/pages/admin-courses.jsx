@@ -73,13 +73,14 @@ export function AdminCourses({ path, navigate }) {
     const video_url = String(formData.get("video_url") || "").trim()
     const filiere_id = formData.get("filiere_id") || null
     const classe_id = formData.get("classe_id") || null
+    const duration = Number(formData.get("duration") || 300)
 
     try {
       if (editingCourse) {
         // Edit Mode
         const updated = await apiRequest(`/api/courses/${editingCourse.id}`, {
           method: "PUT",
-          body: JSON.stringify({ title, description, video_url, filiere_id, classe_id }),
+          body: JSON.stringify({ title, description, video_url, filiere_id, classe_id, duration }),
         })
         setCourses(prev => prev.map(c => c.id === updated.id ? updated : c))
         setMessage("Cours mis à jour avec succès.")
@@ -88,7 +89,7 @@ export function AdminCourses({ path, navigate }) {
         // Add Mode
         const created = await apiRequest("/api/courses", {
           method: "POST",
-          body: JSON.stringify({ title, description, video_url, filiere_id, classe_id }),
+          body: JSON.stringify({ title, description, video_url, filiere_id, classe_id, duration }),
         })
         setCourses(prev => [created, ...prev])
         setMessage("Cours ajouté avec succès.")
@@ -116,6 +117,7 @@ export function AdminCourses({ path, navigate }) {
         formRef.current.elements["video_url"].value = course.video_url
         formRef.current.elements["filiere_id"].value = course.filiere_id || ""
         formRef.current.elements["classe_id"].value = course.classe_id || ""
+        formRef.current.elements["duration"].value = course.duration || 300
       }
     }, 50)
   }
@@ -215,6 +217,20 @@ export function AdminCourses({ path, navigate }) {
                 name="video_url"
                 placeholder="https://www.youtube.com/watch?v=..."
                 required
+                className="h-10 rounded-xl bg-background/50 border-border/50 focus:bg-background"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="course-duration" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Durée du cours (en secondes)</Label>
+              <Input
+                id="course-duration"
+                name="duration"
+                type="number"
+                placeholder="300 (ex: 5 minutes)"
+                required
+                min="1"
+                defaultValue="300"
                 className="h-10 rounded-xl bg-background/50 border-border/50 focus:bg-background"
               />
             </div>

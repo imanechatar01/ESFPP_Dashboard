@@ -123,7 +123,12 @@ export default function CourseCardPreview({ videoUrl, title }) {
 
   // 5. H5P Previews
   // Render H5P embed with pointer-events-none so click bubbles up to the card.
-  if (videoUrl.includes("h5p.com") || videoUrl.includes("h5p.org")) {
+  if (
+    videoUrl.includes("h5p.com") ||
+    videoUrl.includes("h5p.org") ||
+    videoUrl.includes("lumi.education") ||
+    videoUrl.includes("lumi/")
+  ) {
     return (
       <div className="absolute inset-0 w-full h-full bg-slate-900 pointer-events-none select-none overflow-hidden">
         <iframe

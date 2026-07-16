@@ -9,7 +9,7 @@ const navItems = [
 
 export function StudentDashboard({ path, navigate }) {
   const { user } = useAuth()
-  const firstName = user?.user_metadata?.first_name || user?.user_metadata?.prenom || "Étudiant"
+  const firstName = user?.user_metadata?.first_name || user?.user_metadata?.prenom || user?.email?.split('@')[0] || "Étudiant"
 
   return (
     <DashboardShell
