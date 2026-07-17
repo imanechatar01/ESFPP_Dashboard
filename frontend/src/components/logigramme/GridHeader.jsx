@@ -1,6 +1,6 @@
 import { groupWeeksByMonth, formatShortDate, getDominantWeekMonth } from '@/lib/logigramme-helpers';
 
-export function GridHeader({ weeks, onMarkWeek }) {
+export function GridHeader({ weeks, onMarkWeek, onContextMenu }) {
   const weekColumnWidth = 40;
 
   return (
@@ -64,8 +64,9 @@ export function GridHeader({ weeks, onMarkWeek }) {
              <div
                key={idx}
                onClick={() => onMarkWeek && onMarkWeek(w.semaine, 'done')}
+               onContextMenu={onContextMenu ? (e) => onContextMenu(e, w.semaine) : undefined}
                className="w-10 h-8 border-r border-slate-300 flex items-center justify-center text-[10px] font-extrabold text-slate-800 hover:bg-slate-100 cursor-pointer transition-colors"
-               title="Cliquer pour marquer toute la semaine comme 'Terminé'"
+               title="Clic droit pour ouvrir les options de semaine"
              >
                {w.semaine}
              </div>

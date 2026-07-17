@@ -157,8 +157,8 @@ export function useLogigramme(logigrammeId) {
     }
   };
 
-  const createCell = async (uniteId, semaine, heures) => {
-    // Determine completion_status based on auto_done logic (same as backend)
+  const actionCell = async (uniteId, semaine, cell_type, heures = null) => {
+    // Determine completion_status based on auto_done logic
     const today = new Date().toISOString().split('T')[0];
     const week = data?.weeks?.find(w => w.semaine === semaine);
     const isPast = week?.week_start_date && week.week_start_date < today;
@@ -167,6 +167,8 @@ export function useLogigramme(logigrammeId) {
     const tempId = `temp-${Date.now()}`;
     let isUpdate = false;
     let oldCell = null;
+
+    const isDelete = cell_type === 'empty' || (cell_type === 'normal' && (heures === null || heures === undefined || heures === ''));
 
     // Optimistic UI update
     setData(prev => {
@@ -180,24 +182,24 @@ export function useLogigramme(logigrammeId) {
         if (existingCellIndex >= 0) {
           isUpdate = true;
           oldCell = u.cells[existingCellIndex];
-          if (heures === null || heures === undefined) {
+          if (isDelete) {
             nextCells = u.cells.filter(c => c.semaine !== semaine);
           } else {
             nextCells = [...u.cells];
             nextCells[existingCellIndex] = {
               ...oldCell,
+              cell_type,
               heures,
-              // Keep existing ID so toggle still works while saving
             };
           }
         } else {
-          if (heures === null || heures === undefined) {
+          if (isDelete) {
             return u;
           }
           const optimisticCell = {
             id: tempId,
             semaine,
-            cell_type: 'normal',
+            cell_type,
             heures,
             week_start_date: week?.week_start_date || null,
             completion_status: completionStatus,
@@ -216,13 +218,13 @@ export function useLogigramme(logigrammeId) {
         body: JSON.stringify({
           unite_id: uniteId,
           semaine,
-          cell_type: 'normal',
+          cell_type,
           heures,
         })
       });
 
       // If it was a new cell, replace temporary cell with real DB cell (update the id)
-      if (!isUpdate && heures !== null && heures !== undefined) {
+      if (!isUpdate && !isDelete && savedCell && savedCell.id) {
         setData(prev => {
           if (!prev) return prev;
           const nextUnites = prev.unites.map(u => {
@@ -239,7 +241,7 @@ export function useLogigramme(logigrammeId) {
       }
     } catch (err) {
       // Rollback
-      console.error('[useLogigramme] createCell failed, reverting:', err.message);
+      console.error('[useLogigramme] actionCell failed, reverting:', err.message);
       setData(prev => {
         if (!prev) return prev;
         const nextUnites = prev.unites.map(u => {
@@ -247,7 +249,11 @@ export function useLogigramme(logigrammeId) {
           let nextCells;
           if (isUpdate) {
             // Restore old cell
-            nextCells = u.cells.map(c => c.semaine === semaine ? oldCell : c);
+            if (isDelete) {
+               nextCells = [...u.cells, oldCell];
+            } else {
+               nextCells = u.cells.map(c => c.semaine === semaine ? oldCell : c);
+            }
           } else {
             // Remove optimistic cell
             nextCells = u.cells.filter(c => c.id !== tempId);
@@ -261,17 +267,38 @@ export function useLogigramme(logigrammeId) {
     }
   };
 
-  const markWeek = async (semaine, status) => {
+  const actionWeek = async (semaine, action) => {
+    // Optimistic UI update
+    setData(prev => {
+      if (!prev) return prev;
+      const nextUnites = prev.unites.map(u => {
+        let nextCells = u.cells;
+        if (action === 'clear') {
+          nextCells = u.cells.filter(c => c.semaine !== semaine);
+        } else if (action === 'mark_done') {
+          nextCells = u.cells.map(c => 
+            (c.semaine === semaine && c.cell_type === 'normal') 
+              ? { ...c, completion_status: 'done' } 
+              : c
+          );
+        }
+        return calculateUnitMetrics({ ...u, cells: nextCells });
+      });
+      return { ...prev, unites: nextUnites };
+    });
+
     try {
-      await apiRequest(`/api/completion/week`, {
+      await apiRequest(`/api/logigramme/week/action`, {
         method: 'POST',
-        body: JSON.stringify({ logigramme_id: logigrammeId, semaine, status })
+        body: JSON.stringify({ logigramme_id: logigrammeId, semaine, action })
       });
       fetchLogigramme();
     } catch (err) {
+      console.error('[useLogigramme] actionWeek failed, reverting:', err.message);
+      fetchLogigramme();
       throw err;
     }
   };
 
-  return { data, loading, error, toggleCell, createCell, markWeek, refresh: fetchLogigramme };
+  return { data, loading, error, toggleCell, actionCell, actionWeek, refresh: fetchLogigramme };
 }

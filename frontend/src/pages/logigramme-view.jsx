@@ -9,7 +9,7 @@ import { LogigrammeGrid } from "@/components/logigramme/LogigrammeGrid"
 import { useLogigrammeContext } from "@/contexts/logigramme-context"
 import { useLogigramme } from "@/hooks/useLogigramme"
 import { apiRequest } from "@/lib/api"
-import { CalendarDays, FileSpreadsheet, Loader2, AlertCircle, LayoutGrid, Upload, Pencil, PanelLeftClose, PanelLeftOpen, Activity } from "lucide-react"
+import { CalendarDays, FileSpreadsheet, Loader2, AlertCircle, LayoutGrid, Upload, Pencil, PanelLeftClose, PanelLeftOpen, Activity, Printer } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { ImportModal } from "@/components/logigramme/ImportModal"
@@ -34,8 +34,8 @@ export function LogigrammeView({ path, navigate }) {
     data: activeLog,
     loading: loadingGrid,
     toggleCell,
-    createCell,
-    markWeek,
+    actionCell,
+    actionWeek,
     refresh: refreshGrid
   } = useLogigramme(activeLogId)
 
@@ -139,10 +139,12 @@ export function LogigrammeView({ path, navigate }) {
       activePath={path}
       navigate={navigate}
     >
-      <KpiBar />
+      <div className="no-print">
+        <KpiBar />
+      </div>
 
       {/* Toolbar: Filters + Actions */}
-      <div className="flex flex-col lg:flex-row lg:items-center gap-2 mb-2">
+      <div className="flex flex-col lg:flex-row lg:items-center gap-2 mb-2 no-print">
         <FilterBar className="mb-0 flex-1 min-w-0" />
         <div className="flex items-center gap-2 lg:flex-shrink-0 w-full lg:w-auto justify-end">
           <Button
@@ -163,14 +165,22 @@ export function LogigrammeView({ path, navigate }) {
               Éditer
             </Button>
           )}
+
+          {filters.formateur_id && (
+            <Button
+              onClick={() => window.print()}
+              className="rounded-xl font-bold uppercase tracking-widest text-[10px] h-[34px] px-3 flex-1 sm:flex-initial bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              <Printer className="size-3.5 mr-1.5" />
+              Imprimer
+            </Button>
+          )}
         </div>
       </div>
 
       {filters.formateur_id ? (
         <FormateurVue
           formateurId={filters.formateur_id}
-          onToggleCell={toggleCell}
-          onMarkWeek={markWeek}
         />
       ) : (
         <div className="flex gap-3 relative">
@@ -254,8 +264,8 @@ export function LogigrammeView({ path, navigate }) {
                 data={activeLog}
                 loading={loadingGrid}
                 onToggleCell={toggleCell}
-                onCreateCell={createCell}
-                onMarkWeek={markWeek}
+                onActionCell={actionCell}
+                onActionWeek={actionWeek}
               />
             ) : (
               <div className="flex flex-col items-center justify-center py-32 bg-card rounded-2xl border border-dashed border-border medical-glass">

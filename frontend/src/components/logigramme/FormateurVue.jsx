@@ -4,6 +4,9 @@ import { useLogigrammeContext } from '@/contexts/logigramme-context';
 import { GridHeader } from './GridHeader';
 import { GridRow } from './GridRow';
 import { Legend } from './Legend';
+import { CellContextMenu } from './CellContextMenu';
+import { WeekContextMenu } from './WeekContextMenu';
+import { PrintableFormateurTable } from './PrintableFormateurTable';
 import { Loader2, AlertTriangle, Info } from 'lucide-react';
 
 const calculateUnitMetrics = (unit) => {
@@ -27,10 +30,12 @@ const calculateUnitMetrics = (unit) => {
 };
 
 export function FormateurVue({ formateurId }) {
-  const { filters } = useLogigrammeContext();
+  const { filters, formateurs } = useLogigrammeContext();
   const [data, setData] = useState(null);
   const [weeks, setWeeks] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [cellMenu, setCellMenu] = useState(null);
+  const [weekMenu, setWeekMenu] = useState(null);
 
   const fetchFormateurData = async () => {
     if (!formateurId) return;
@@ -84,10 +89,10 @@ export function FormateurVue({ formateurId }) {
 
   // Group units by logigramme
   const logigrammeGroups = unites.reduce((acc, unit) => {
-    const logId = unit.logigramme_id;
+    const logId = unit.logigramme_id || 'unknown';
     if (!acc[logId]) {
       acc[logId] = {
-        meta: unit.logigramme,
+        meta: unit.logigramme || { id: logId },
         items: []
       };
     }
@@ -129,20 +134,41 @@ export function FormateurVue({ formateurId }) {
     }
   };
 
-  const handleMarkWeek = async (logigrammeId, semaine, status) => {
+  const handleActionWeek = async (logigrammeId, semaine, action) => {
+    // Optimistic UI update
+    setData(prev => {
+      if (!prev) return prev;
+      const nextUnites = prev.unites.map(u => {
+        if (u.logigramme_id !== logigrammeId) return u;
+        let nextCells = u.cells;
+        if (action === 'clear') {
+          nextCells = u.cells.filter(c => c.semaine !== semaine);
+        } else if (action === 'mark_done') {
+          nextCells = u.cells.map(c => 
+            (c.semaine === semaine && c.cell_type === 'normal') 
+              ? { ...c, completion_status: 'done' } 
+              : c
+          );
+        }
+        return calculateUnitMetrics({ ...u, cells: nextCells });
+      });
+      return { ...prev, unites: nextUnites };
+    });
+
     try {
-      await apiRequest(`/api/completion/week`, {
+      await apiRequest(`/api/logigramme/week/action`, {
         method: 'POST',
-        body: JSON.stringify({ logigramme_id: logigrammeId, semaine, status })
+        body: JSON.stringify({ logigramme_id: logigrammeId, semaine, action })
       });
       // Refresh list to update all cells in that logigramme
       await fetchFormateurData();
     } catch (err) {
       console.error('Failed to mark week:', err);
+      fetchFormateurData(); // Revert on error
     }
   };
 
-  const handleCreateCell = async (uniteId, semaine, heures) => {
+  const handleActionCell = async (uniteId, semaine, cell_type, heures) => {
     // Determine completion_status based on auto_done logic
     const today = new Date().toISOString().split('T')[0];
     const week = weeks?.find(w => w.semaine === semaine);
@@ -152,6 +178,8 @@ export function FormateurVue({ formateurId }) {
     const tempId = `temp-${Date.now()}`;
     let isUpdate = false;
     let oldCell = null;
+
+    const isDelete = cell_type === 'empty' || (cell_type === 'normal' && (heures === null || heures === undefined || heures === ''));
 
     // Optimistic UI update
     setData(prev => {
@@ -165,23 +193,24 @@ export function FormateurVue({ formateurId }) {
         if (existingCellIndex >= 0) {
           isUpdate = true;
           oldCell = u.cells[existingCellIndex];
-          if (heures === null || heures === undefined) {
+          if (isDelete) {
             nextCells = u.cells.filter(c => c.semaine !== semaine);
           } else {
             nextCells = [...u.cells];
             nextCells[existingCellIndex] = {
               ...oldCell,
+              cell_type,
               heures,
             };
           }
         } else {
-          if (heures === null || heures === undefined) {
+          if (isDelete) {
             return u;
           }
           const optimisticCell = {
             id: tempId,
             semaine,
-            cell_type: 'normal',
+            cell_type,
             heures,
             week_start_date: week?.week_start_date || null,
             completion_status: completionStatus,
@@ -200,7 +229,7 @@ export function FormateurVue({ formateurId }) {
         body: JSON.stringify({
           unite_id: uniteId,
           semaine,
-          cell_type: 'normal',
+          cell_type,
           heures,
         })
       });
@@ -215,7 +244,11 @@ export function FormateurVue({ formateurId }) {
           if (u.id !== uniteId) return u;
           let nextCells;
           if (isUpdate) {
-            nextCells = u.cells.map(c => c.semaine === semaine ? oldCell : c);
+            if (isDelete) {
+              nextCells = [...u.cells, oldCell];
+            } else {
+              nextCells = u.cells.map(c => c.semaine === semaine ? oldCell : c);
+            }
           } else {
             nextCells = u.cells.filter(c => c.id !== tempId);
           }
@@ -227,10 +260,46 @@ export function FormateurVue({ formateurId }) {
     }
   };
 
+  const handleCellContextMenu = (e, unite, semaine, cell) => {
+    e.preventDefault();
+    setCellMenu({ x: e.clientX, y: e.clientY, unite, semaine, cell });
+    setWeekMenu(null);
+  };
+
+  const handleWeekContextMenu = (e, logigrammeId, semaine) => {
+    e.preventDefault();
+    setWeekMenu({ x: e.clientX, y: e.clientY, logigrammeId, semaine });
+    setCellMenu(null);
+  };
+
+  const handleCellSelect = (cell_type, heures) => {
+    if (!cellMenu) return;
+    const { unite, semaine } = cellMenu;
+    handleActionCell(unite.id, semaine, cell_type, heures ?? null);
+    setCellMenu(null);
+  };
+
+  const handleWeekSelect = (action) => {
+    if (!weekMenu) return;
+    const { logigrammeId, semaine } = weekMenu;
+    handleActionWeek(logigrammeId, semaine, action);
+    setWeekMenu(null);
+  };
+
+  const formateurNom = formateurs?.find(f => f.id === formateurId)?.nom || 'Formateur';
+
   return (
     <div className="space-y-6">
+      {/* ── Print-only: merged table (hidden on screen, shown on print) ─── */}
+      <PrintableFormateurTable
+        formateurNom={formateurNom}
+        unites={unites}
+        weeks={weeks}
+        onContextMenu={handleCellContextMenu}
+      />
+
       {/* ── Info Banner ─────────────────────────────────────────────────── */}
-      <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 flex items-center justify-between">
+      <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 flex items-center justify-between no-print">
         <div className="flex items-center gap-3">
           <div className="size-10 rounded-xl bg-primary/10 flex items-center justify-center">
             <Info className="size-5 text-primary" />
@@ -255,7 +324,7 @@ export function FormateurVue({ formateurId }) {
 
       {/* ── Conflicts List ───────────────────────────────────────────────── */}
       {conflicts.length > 0 && (
-        <div className="p-4 rounded-2xl border border-destructive/20 bg-destructive/5 space-y-3">
+        <div className="p-4 rounded-2xl border border-destructive/20 bg-destructive/5 space-y-3 no-print">
           <h4 className="text-[10px] font-black uppercase tracking-widest text-destructive/60">Détails des conflits</h4>
           <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
             {conflicts.map((conf, idx) => (
@@ -276,13 +345,13 @@ export function FormateurVue({ formateurId }) {
 
       {/* ── Grids per Logigramme ────────────────────────────────────────── */}
       {Object.values(logigrammeGroups).map((group) => (
-        <div key={group.meta.id} className="space-y-3">
+        <div key={group.meta?.id || Math.random()} className="space-y-3">
           <div className="flex items-center gap-2 px-1">
             <span className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-primary text-white">
-              {group.meta.filiere.code}
+              {group.meta?.filiere?.code || '—'}
             </span>
             <h3 className="text-xs font-black text-foreground uppercase tracking-widest">
-              {group.meta.filiere.name} — {group.meta.classe.label}
+              {group.meta?.filiere?.name || 'Programme Inconnu'} — {group.meta?.classe?.label || '—'}
             </h3>
           </div>
 
@@ -293,9 +362,10 @@ export function FormateurVue({ formateurId }) {
                   weeks={weeks}
                   onMarkWeek={(sem, status) => {
                     if (confirm(`Voulez-vous marquer toute la semaine ${sem} comme '${status}'?`)) {
-                      handleMarkWeek(group.meta.id, sem, status);
+                      handleActionWeek(group.meta?.id, sem, 'mark_done');
                     }
                   }}
+                  onContextMenu={(e, semaine) => handleWeekContextMenu(e, group.meta?.id, semaine)}
                 />
                 <div className="flex flex-col">
                   {group.items.map((unite, idx) => (
@@ -305,7 +375,7 @@ export function FormateurVue({ formateurId }) {
                       rowIndex={idx + 1}
                       weeksCount={weeks.length}
                       onToggleCell={handleToggleCell}
-                      onCreateCell={handleCreateCell}
+                      onContextMenu={handleCellContextMenu}
                       highlightWeeks={[]}
                     />
                   ))}
@@ -316,7 +386,26 @@ export function FormateurVue({ formateurId }) {
         </div>
       ))}
 
-      <Legend />
+      <div className="no-print">
+        <Legend />
+      </div>
+
+      {cellMenu && (
+        <CellContextMenu
+          x={cellMenu.x}
+          y={cellMenu.y}
+          onClose={() => setCellMenu(null)}
+          onSelect={handleCellSelect}
+        />
+      )}
+      {weekMenu && (
+        <WeekContextMenu
+          x={weekMenu.x}
+          y={weekMenu.y}
+          onClose={() => setWeekMenu(null)}
+          onSelect={handleWeekSelect}
+        />
+      )}
     </div>
   );
 }
