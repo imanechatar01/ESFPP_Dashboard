@@ -26,13 +26,21 @@ import { useAuth } from "@/contexts/auth-context"
 
 export function DashboardShell({ title, subtitle, navItems, activePath, navigate, accent = "admin", children }) {
   const { user, role, signOut } = useAuth()
-  const [isCollapsed, setIsCollapsed] = useState(() => {
+
+  // isPinned = sidebar locked open by a deliberate click (persisted)
+  // isHoverOpen = sidebar temporarily open by a 3-second hover preview (ephemeral)
+  const [isPinned, setIsPinned] = useState(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('sidebar-collapsed');
-      return saved === 'true';
+      return localStorage.getItem('sidebar-pinned') === 'true';
     }
     return false;
   });
+  const [isHoverOpen, setIsHoverOpen] = useState(false);
+  const hoverTimerRef = useRef(null);
+
+  // Derived: sidebar is visually open when pinned OR hover-previewing
+  const sidebarOpen = isPinned || isHoverOpen;
+
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const dropdownRef = useRef(null)
@@ -70,9 +78,17 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
       },
     ]
 
+  // Persist only the pinned state
   useEffect(() => {
-    localStorage.setItem('sidebar-collapsed', isCollapsed.toString());
-  }, [isCollapsed]);
+    localStorage.setItem('sidebar-pinned', isPinned.toString());
+  }, [isPinned]);
+
+  // Cleanup hover timer on unmount to prevent ghost openings
+  useEffect(() => {
+    return () => {
+      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -94,7 +110,8 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
       <div
         className={cn(
           "grid min-h-screen transition-all duration-300 ease-in-out grid-cols-1",
-          isCollapsed ? "md:grid-cols-[64px_1fr]" : "md:grid-cols-[200px_1fr]"
+          // Layout column only expands when pinned, not during hover preview
+          isPinned ? "md:grid-cols-[200px_1fr]" : "md:grid-cols-[64px_1fr]"
         )}
       >
         {/* Sidebar Drawer Mobile Overlay */}
@@ -110,15 +127,21 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
           className={cn(
             "fixed inset-y-0 left-0 z-50 flex flex-col border-r border-border bg-sidebar/95 backdrop-blur-2xl px-2 py-4 transform transition-all duration-300 ease-in-out shadow-2xl md:static md:translate-x-0 md:bg-sidebar/50 md:shadow-none md:overflow-hidden",
             isMobileOpen ? "translate-x-0" : "-translate-x-full",
-            isCollapsed ? "md:w-16" : "md:w-[200px]"
+            sidebarOpen ? "md:w-[200px]" : "md:w-16"
           )}
+          onMouseLeave={() => {
+            // If opened only by hover (not pinned), close on mouse leave
+            if (!isPinned) {
+              setIsHoverOpen(false);
+            }
+          }}
         >
           <div className="flex items-center gap-2 px-2 mb-6 transition-all">
-            <div className={cn("flex items-center gap-2 flex-1", isCollapsed && "md:justify-center")}>
+            <div className={cn("flex items-center gap-2 flex-1", !sidebarOpen && "md:justify-center")}>
               <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-md shadow-primary/20">
                 <HeartPulse className="size-4" />
               </div>
-              {(!isCollapsed || isMobileOpen) && (
+              {(sidebarOpen || isMobileOpen) && (
                 <div className="animate-in fade-in slide-in-from-left-2 duration-300">
                   <p className="text-sm font-bold tracking-tight leading-none">ESFPP</p>
                   <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground mt-0.5 whitespace-nowrap">
@@ -140,7 +163,7 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
           <nav className="flex flex-col gap-4 flex-1 overflow-y-auto custom-scrollbar">
             {menuSections.map((section) => (
               <div key={section.title} className="flex flex-col gap-1">
-                {(!isCollapsed || isMobileOpen) && (
+                {(sidebarOpen || isMobileOpen) && (
                   <p className="px-2 mb-0.5 text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 animate-in fade-in duration-300">
                     {section.title}
                   </p>
@@ -156,19 +179,19 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
                           navigate(path);
                           setIsMobileOpen(false);
                         }}
-                        title={isCollapsed && !isMobileOpen ? label : ""}
+                        title={!sidebarOpen && !isMobileOpen ? label : ""}
                         className={cn(
                           "flex h-9 items-center gap-2 rounded-lg px-2 text-left text-xs font-semibold transition-all duration-200 group relative",
                           isActive
                             ? "bg-primary/10 text-primary font-bold"
                             : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                          isActive && (!isCollapsed || isMobileOpen) && "border-l-3 border-accent rounded-l-none pl-1.5",
-                          isCollapsed && !isMobileOpen && "justify-center px-0"
+                          isActive && (sidebarOpen || isMobileOpen) && "border-l-3 border-accent rounded-l-none pl-1.5",
+                          !sidebarOpen && !isMobileOpen && "justify-center px-0"
                         )}
                       >
                         <Icon className={cn("size-4 shrink-0", isActive ? "text-accent" : "text-muted-foreground group-hover:text-primary")} />
-                        {(!isCollapsed || isMobileOpen) && <span className="animate-in fade-in duration-300 truncate">{label}</span>}
-                        {isCollapsed && !isMobileOpen && isActive && (
+                        {(sidebarOpen || isMobileOpen) && <span className="animate-in fade-in duration-300 truncate">{label}</span>}
+                        {!sidebarOpen && !isMobileOpen && isActive && (
                           <div className="absolute left-0 w-0.5 h-5 bg-accent rounded-r-full" />
                         )}
                       </button>
@@ -180,7 +203,7 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
           </nav>
 
           <div className="mt-auto px-1">
-            {(!isCollapsed || isMobileOpen) ? (
+            {(sidebarOpen || isMobileOpen) ? (
               <div className="p-2 rounded-xl bg-muted/50 border border-border/50 animate-in zoom-in-95 duration-300">
                 <p className="text-[10px] font-semibold text-muted-foreground">Support</p>
               </div>
@@ -200,14 +223,37 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
           {/* Compact header */}
           <header className="sticky top-0 z-20 flex h-20 items-center justify-between border-b border-slate-100 bg-white px-6 shadow-sm">
             <div className="flex items-center gap-4">
-              {/* NEW TOGGLE BUTTON (desktop only) */}
+              {/* Toggle button — click to pin/unpin, hover for 3-second preview */}
               <button
                 type="button"
-                onClick={() => setIsCollapsed(!isCollapsed)}
+                onClick={() => {
+                  // Clear any pending hover timer on click
+                  if (hoverTimerRef.current) {
+                    clearTimeout(hoverTimerRef.current);
+                    hoverTimerRef.current = null;
+                  }
+                  // Discard hover preview; toggle the pinned state
+                  setIsHoverOpen(false);
+                  setIsPinned(prev => !prev);
+                }}
+                onMouseEnter={() => {
+                  // Only start the hover timer when not already pinned open
+                  if (isPinned) return;
+                  hoverTimerRef.current = setTimeout(() => {
+                    setIsHoverOpen(true);
+                  }, 3000);
+                }}
+                onMouseLeave={() => {
+                  // Cancel timer if mouse leaves before 3 seconds
+                  if (hoverTimerRef.current) {
+                    clearTimeout(hoverTimerRef.current);
+                    hoverTimerRef.current = null;
+                  }
+                }}
                 className="hidden md:flex p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-all cursor-pointer"
-                aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                aria-label={isPinned ? "Réduire la sidebar" : "Épingler la sidebar"}
               >
-                {isCollapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
+                {sidebarOpen ? <PanelLeftClose className="size-4" /> : <PanelLeftOpen className="size-4" />}
               </button>
 
               {/* Mobile menu button */}

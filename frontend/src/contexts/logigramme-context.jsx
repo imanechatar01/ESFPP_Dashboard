@@ -1,7 +1,7 @@
 
 // @refresh reset
 // frontend/src/contexts/logigramme-context.jsx
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { apiRequest } from '../lib/api';
 
 const LogigrammeContext = createContext();
@@ -23,6 +23,10 @@ export function LogigrammeProvider({ children }) {
   const [classes, setClasses] = useState([]);
   const [niveaux, setNiveaux] = useState([]); // new
   const [loading, setLoading] = useState(true);
+
+  // Global KPIs State
+  const [kpis, setKpis] = useState(null);
+  const [loadingKpis, setLoadingKpis] = useState(false);
 
   async function loadLookups() {
     setLoading(true);
@@ -56,6 +60,27 @@ export function LogigrammeProvider({ children }) {
     loadLookups();
   }, []);
 
+  const fetchKpis = useCallback(async () => {
+    setLoadingKpis(true);
+    try {
+      const query = new URLSearchParams();
+      if (filters.year_id) query.append('year_id', filters.year_id);
+      if (filters.filiere_id) query.append('filiere_id', filters.filiere_id);
+      if (filters.formateur_id) query.append('formateur_id', filters.formateur_id);
+
+      const data = await apiRequest(`/api/logigramme/kpis?${query.toString()}`);
+      setKpis(data);
+    } catch (err) {
+      console.error('Failed to fetch KPIs:', err);
+    } finally {
+      setLoadingKpis(false);
+    }
+  }, [filters.year_id, filters.filiere_id, filters.formateur_id]);
+
+  useEffect(() => {
+    fetchKpis();
+  }, [fetchKpis]);
+
   const setFilter = (key, value) => {
     setFiltersState(prev => {
       const next = { ...prev, [key]: value };
@@ -83,7 +108,8 @@ export function LogigrammeProvider({ children }) {
     <LogigrammeContext.Provider value={{
       filters, setFilter, resetFilters,
       years, filieres, formateurs, classes, niveaux,
-      loading, refreshLookups: loadLookups
+      loading, refreshLookups: loadLookups,
+      kpis, loadingKpis, refreshKpis: fetchKpis
     }}>
     {children}
     </LogigrammeContext.Provider>

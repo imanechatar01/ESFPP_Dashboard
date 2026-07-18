@@ -145,7 +145,9 @@ router.get('/kpis', async (req, res) => {
       total_programmes: uniqueLogIds.size,
       total_heures: Math.round(totalVhg),
       total_formateurs: uniqueFormateurIds.size,
-      taux_global: totalVhg > 0 ? totalRealise / totalVhg : 0
+      taux_global: totalVhg > 0 ? totalRealise / totalVhg : 0,
+      total_realise: totalRealise,
+      total_vhg: totalVhg
     });
   } catch (err) {
     console.error(err);
