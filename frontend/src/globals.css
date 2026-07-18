@@ -170,8 +170,10 @@
 
 /* ── Print Styles ──────────────────────────────────────────────────────────── */
 @page {
-  size: A3 landscape;
-  margin: 10mm 8mm;
+  /* A4 landscape gives ~277mm x 190mm usable area with 10mm margins.
+     This is the most universally supported print size. */
+  size: A4 landscape;
+  margin: 8mm 10mm;
 }
 
 @media print {
@@ -235,6 +237,24 @@
   /* 8. Show the print-only merged table, hide screen-only tables */
   .print-only {
     display: block !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* 8b. Force the table inside .print-only to fill the full page width */
+  .print-only table {
+    width: 100% !important;
+    max-width: 100% !important;
+    table-layout: fixed !important;
+    overflow: hidden !important;
+  }
+
+  /* 8c. Truncate overflowing text in label cells */
+  .print-only td,
+  .print-only th {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
   }
 
   /* 9. Hide ALL the screen-only FormateurVue elements

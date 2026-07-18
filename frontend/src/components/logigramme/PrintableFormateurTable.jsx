@@ -75,23 +75,23 @@ export function PrintableFormateurTable({ formateurNom, unites, weeks, onContext
     /* print-only: hidden on screen, shown on print via globals.css */
     <div className="print-only">
         {/* ── Document Header ──────────────────────────────────────────────── */}
-        <div style={{ marginBottom: '10px', borderBottom: '2px solid #1e3a6e', paddingBottom: '6px' }}>
+        <div style={{ marginBottom: '6px', borderBottom: '2px solid #1e3a6e', paddingBottom: '4px' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '16px' }}>
             <h1 style={{
-              fontSize: '13pt',
+              fontSize: dedupedUnites.length > 15 ? '9pt' : '12pt',
               fontWeight: 900,
               textTransform: 'uppercase',
-              letterSpacing: '0.2em',
+              letterSpacing: '0.15em',
               color: '#1e3a6e',
               margin: 0
             }}>
               Plan de Formation
             </h1>
-            <span style={{ fontSize: '10pt', fontWeight: 700, color: '#374151' }}>
+            <span style={{ fontSize: dedupedUnites.length > 15 ? '8pt' : '9pt', fontWeight: 700, color: '#374151' }}>
               Formateur : {formateurNom}
             </span>
           </div>
-          <p style={{ fontSize: '7.5pt', color: '#6b7280', marginTop: '3px', marginBottom: 0 }}>
+          <p style={{ fontSize: '6.5pt', color: '#6b7280', marginTop: '2px', marginBottom: 0 }}>
             {programmeLabels.join('  |  ')} &nbsp;—&nbsp;
             <strong>{dedupedUnites.length} unités</strong> &nbsp;—&nbsp;
             <strong>{totalVhg} h VHG total</strong> &nbsp;—&nbsp;
@@ -100,24 +100,30 @@ export function PrintableFormateurTable({ formateurNom, unites, weeks, onContext
         </div>
 
         {/* ── Merged Table ─────────────────────────────────────────────────── */}
+        {/* Layout rationale:
+             - Fixed 3 label cols take ~28% of width (Programme + N° + Unité)
+             - Remaining 72% split equally among all active week columns
+             - tableLayout: fixed + width: 100% ensures the table always
+               spans the full printable width, whatever the column count.
+        */}
         <table style={{
           width: '100%',
           borderCollapse: 'collapse',
           tableLayout: 'fixed',
-          fontSize: '6.5pt',
+          fontSize: `${Math.max(4.5, Math.min(6.5, 200 / Math.max(activeWeeks.length, 10)))}pt`,
           fontFamily: 'Figtree, ui-sans-serif, system-ui, sans-serif',
         }}>
           <colgroup>
-            {/* Programme column */}
-            <col style={{ width: '78px' }} />
-            {/* # */}
-            <col style={{ width: '20px' }} />
-            {/* Unité de formation */}
-            <col style={{ width: '138px' }} />
+            {/* Programme column — fixed ~10% */}
+            <col style={{ width: '10%' }} />
+            {/* # — fixed ~3% */}
+            <col style={{ width: '3%' }} />
+            {/* Unité de formation — fixed ~15% */}
+            <col style={{ width: '15%' }} />
             {/* NOTE: VHG column removed — Point 2 */}
-            {/* One col per ACTIVE week — Point 3 */}
+            {/* One col per ACTIVE week — remaining 72% split equally */}
             {activeWeeks.map((w) => (
-              <col key={w.semaine} style={{ width: `${Math.max(13, Math.floor(600 / activeWeeks.length))}px` }} />
+              <col key={w?.semaine || Math.random()} style={{ width: `${72 / Math.max(activeWeeks.length, 1)}%` }} />
             ))}
           </colgroup>
 

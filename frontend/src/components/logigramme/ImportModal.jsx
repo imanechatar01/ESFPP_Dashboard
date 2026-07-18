@@ -246,6 +246,14 @@ export function ImportModal({ isOpen, onClose, onImportSuccess }) {
               </div>
             </div>
 
+            {/* Warning Message */}
+            <div className="p-3.5 rounded-xl border border-border bg-muted/40 text-muted-foreground text-xs font-medium flex items-start gap-2.5">
+              <AlertCircle className="size-4 shrink-0 text-primary/70 mt-0.5" />
+              <span>
+                Si le fichier importé contient des couleurs ambiguës ou des cellules à 0 heure, certaines erreurs peuvent apparaître après l'import.
+              </span>
+            </div>
+
             {/* Error Message */}
             {error && (
               <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-bold flex items-center gap-2 animate-in slide-in-from-top-2">
