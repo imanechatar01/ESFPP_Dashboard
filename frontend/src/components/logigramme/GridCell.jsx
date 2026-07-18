@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 export function GridCell({ cell, semaine, onToggle, onContextMenu, isHighlighted = false }) {
   const isExistingNormal = cell && cell.cell_type === 'normal';
   const displayHeures = isExistingNormal && cell.heures !== null && cell.heures !== undefined
-    ? Math.round(Number(cell.heures))
+    ? Number(cell.heures)
     : null;
   const displayHeuresLabel = displayHeures !== null ? `${displayHeures}` : '';
 

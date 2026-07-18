@@ -54,9 +54,13 @@ export function CellContextMenu({ x = 0, y = 0, onClose = () => {}, onSelect = (
 
   const handleSessionSubmit = (e) => {
     e.preventDefault();
-    if (hours.trim() !== '') {
-      onSelect('normal', Number(hours));
-      onClose();
+    const cleanHours = hours.replace(',', '.');
+    if (cleanHours.trim() !== '') {
+      const parsed = parseFloat(cleanHours);
+      if (!isNaN(parsed)) {
+        onSelect('normal', parsed);
+        onClose();
+      }
     }
   };
 
@@ -113,13 +117,18 @@ export function CellContextMenu({ x = 0, y = 0, onClose = () => {}, onSelect = (
           <span className="w-2.5 h-2.5 rounded-full bg-[#FEF9C3] border border-slate-300 flex-shrink-0"></span>
           <input
             ref={inputRef}
-            type="number"
-            step="0.5"
-            min="0"
+            type="text"
+            inputMode="decimal"
             className="w-16 px-1 py-0.5 border border-slate-300 rounded text-xs"
             placeholder="Heures"
             value={hours}
-            onChange={(e) => setHours(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              // Allow numbers, single dot or comma, and digits
+              if (val === '' || /^\d*[.,]?\d*$/.test(val)) {
+                setHours(val);
+              }
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Escape') {
                 e.stopPropagation();

@@ -69,7 +69,7 @@ export function PrintableFormateurTable({ formateurNom, unites, weeks, onContext
   )];
 
   // Total VHG (kept in the document header text only, column removed)
-  const totalVhg = dedupedUnites.reduce((sum, u) => sum + (parseFloat(u.vhg) || 0), 0);
+  const totalVhg = Number(dedupedUnites.reduce((sum, u) => sum + (parseFloat(u.vhg) || 0), 0).toFixed(1));
 
   return (
     /* print-only: hidden on screen, shown on print via globals.css */

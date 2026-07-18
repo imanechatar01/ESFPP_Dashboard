@@ -100,7 +100,7 @@ export function FormateurVue({ formateurId }) {
     return acc;
   }, {});
 
-  const totalVhg = unites.reduce((sum, u) => sum + (parseFloat(u.vhg) || 0), 0);
+  const totalVhg = Number(unites.reduce((sum, u) => sum + (parseFloat(u.vhg) || 0), 0).toFixed(1));
 
   // ── Cell Interaction Handlers ──────────────────────────────────────────
   const handleToggleCell = async (cellId, currentStatus) => {

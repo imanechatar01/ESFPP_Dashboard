@@ -48,7 +48,7 @@ export function GridRow({ unite, rowIndex, weeksCount = 52, onToggleCell, onCont
       <div className="sticky right-0 z-20 w-24 h-12 bg-white border-b border-l border-slate-300 flex items-center px-2 group-hover:bg-slate-50 transition-colors select-none flex-shrink-0">
         <div className="w-full">
            <div className="flex justify-between text-[9px] font-black text-slate-700 mb-0.5">
-             <span>{Math.round(vh_realise)}h / {vhg}h</span>
+             <span>{Number(vh_realise.toFixed(1))}h / {vhg}h</span>
              <span className={completionPercentage >= 100 ? 'text-emerald-600' : ''}>{completionPercentage}%</span>
            </div>
            <div className="text-[8px] font-extrabold text-slate-400 uppercase mb-1">
