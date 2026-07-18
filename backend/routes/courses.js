@@ -114,6 +114,24 @@ router.post('/:courseId/progress', async (req, res) => {
 
     if (error) throw error;
 
+    // Dynamically update the course duration in the courses table if it changed.
+    // We only update the 'duration' column, ensuring we never update or overwrite 'video_url'.
+    const roundedDuration = Math.round(Number(duration_seconds));
+    if (roundedDuration > 0) {
+      const { data: course } = await supabaseAdmin
+        .from('courses')
+        .select('duration')
+        .eq('id', courseId)
+        .single();
+      
+      if (course && course.duration !== roundedDuration) {
+        await supabaseAdmin
+          .from('courses')
+          .update({ duration: roundedDuration })
+          .eq('id', courseId);
+      }
+    }
+
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: err.message });
