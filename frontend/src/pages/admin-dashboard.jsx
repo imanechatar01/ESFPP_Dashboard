@@ -1,11 +1,32 @@
-import { Activity, CalendarCheck, GraduationCap, Users, UserPlus, ClipboardCheck, ArrowUpRight, CalendarDays } from "lucide-react"
+// frontend/src/pages/admin-dashboard.jsx
+import { 
+  Activity, 
+  CalendarCheck, 
+  GraduationCap, 
+  Users, 
+  UserPlus,
+  ClipboardCheck, 
+  ArrowUpRight, 
+  CalendarDays, 
+  FileSpreadsheet,
+  LayoutGrid,
+  BookOpen,
+  TrendingUp,
+  Clock,
+  AlertCircle
+} from "lucide-react"
 import { DashboardShell } from "@/components/layout/dashboard-shell"
 import { cn } from "@/lib/utils"
 
 const navItems = [
   { label: "Tableau de bord", path: "/admin/dashboard", icon: Activity },
+   { label: "Gestion des comptes", path: "/admin/accounts", icon: Users },
   { label: "Logigrammes", path: "/admin/logigrammes", icon: CalendarDays },
-  { label: "Gestion des comptes", path: "/admin/accounts", icon: Users },
+  { label: "Gestion des contrôles", path: "/admin/controls", icon: FileSpreadsheet },
+   { label: "Filières", path: "/admin/filieres", icon: GraduationCap },
+  { label: "Cours & Vidéos", path: "/admin/courses", icon: BookOpen },
+  { label: "Formateurs", path: "/admin/formateurs", icon: UserPlus },
+  { label: "Années", path: "/admin/academic-years", icon: CalendarDays },
 ]
 
 const stats = [
@@ -20,7 +41,7 @@ export function AdminDashboard({ path, navigate }) {
     <DashboardShell
       title="Tableau de bord"
       subtitle="Bienvenue sur votre espace de pilotage ESFPP."
-      navItems={navItems}
+      
       activePath={path}
       navigate={navigate}
     >
@@ -115,4 +136,3 @@ export function AdminDashboard({ path, navigate }) {
     </DashboardShell>
   )
 }
-

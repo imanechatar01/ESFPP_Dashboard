@@ -135,7 +135,7 @@ export function LogigrammeView({ path, navigate }) {
     <DashboardShell
       title="Logigrammes"
       subtitle="Visualisation et suivi de l'avancement pédagogique."
-      navItems={navItems}
+      
       activePath={path}
       navigate={navigate}
     >

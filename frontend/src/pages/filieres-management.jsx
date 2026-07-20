@@ -2,16 +2,25 @@ import { useState, useEffect } from "react"
 import { DashboardShell } from "@/components/layout/dashboard-shell"
 import { apiRequest } from "@/lib/api"
 import { 
-  BookOpen, 
-  Plus, 
-  Pencil, 
-  Trash2, 
-  AlertTriangle, 
-  X, 
+  Activity, 
+  CalendarCheck, 
+  GraduationCap, 
+  Users, 
+  Search,
+  Plus,
   Loader2,
-  CheckCircle2,
-  CalendarDays,
-  Search
+  Pencil,
+  Trash2,
+  UserPlus,
+  ClipboardCheck, 
+  ArrowUpRight, 
+  CalendarDays, 
+  FileSpreadsheet,
+  LayoutGrid,
+  BookOpen,
+  TrendingUp,
+  Clock,
+  AlertCircle
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,10 +28,16 @@ import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 
 const navItems = [
-  { label: "Tableau de bord", path: "/admin/dashboard", icon: BookOpen },
+  { label: "Tableau de bord", path: "/admin/dashboard", icon: Activity },
+   { label: "Gestion des comptes", path: "/admin/accounts", icon: Users },
   { label: "Logigrammes", path: "/admin/logigrammes", icon: CalendarDays },
-  { label: "Filières", path: "/admin/filieres", icon: BookOpen },
+  { label: "Gestion des contrôles", path: "/admin/controls", icon: FileSpreadsheet },
+   { label: "Filières", path: "/admin/filieres", icon: GraduationCap },
+  { label: "Cours & Vidéos", path: "/admin/courses", icon: BookOpen },
+  { label: "Formateurs", path: "/admin/formateurs", icon: UserPlus },
+  { label: "Années", path: "/admin/academic-years", icon: CalendarDays },
 ]
+
 
 export default function FilieresManagement({ path, navigate }) {
   const [filieres, setFilieres] = useState([])
@@ -144,7 +159,7 @@ export default function FilieresManagement({ path, navigate }) {
     <DashboardShell
       title="Gestion des Filières"
       subtitle="Configurez les programmes de formation et leurs cycles."
-      navItems={navItems}
+      
       activePath={path}
       navigate={navigate}
     >

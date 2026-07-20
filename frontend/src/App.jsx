@@ -15,6 +15,7 @@ import { AdminCourses } from "@/pages/admin-courses"
 import { StudentCourses } from "@/pages/student-courses"
 import { LogigrammeProvider } from "@/contexts/logigramme-context"
 import { useCallback, useEffect, useState } from "react"
+import { ControlsManagement } from './pages/controls-management' // ✅ AJOUTER CETTE LIGNE
 
 function usePath() {
   const [path, setPath] = useState(() => window.location.pathname)
@@ -76,6 +77,7 @@ function AppRoutes() {
           {path === "/admin/formateurs" && <FormateursManagement path={path} navigate={navigate} />}
           {path === "/admin/academic-years" && <AcademicYears path={path} navigate={navigate} />}
           {path === "/admin/courses" && <AdminCourses path={path} navigate={navigate} />}
+          {path === "/admin/controls" && <ControlsManagement path={path} navigate={navigate} />} {/* ✅ AJOUTER CETTE LIGNE */}
         </LogigrammeProvider>
       </RequireRole>
     )

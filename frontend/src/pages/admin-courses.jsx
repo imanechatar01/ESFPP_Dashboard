@@ -171,7 +171,7 @@ export function AdminCourses({ path, navigate }) {
     <DashboardShell
       title="Gestion des cours & vidéos"
       subtitle="Publiez et gérez les ressources vidéo pédagogiques par filière et classe."
-      navItems={navItems}
+      
       activePath={path}
       navigate={navigate}
     >

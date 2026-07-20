@@ -1,4 +1,4 @@
-// frontend/src/components/layout/dashboard-shell.jsx (compact version with toggle in header)
+// frontend/src/components/layout/dashboard-shell.jsx
 import { useState, useRef, useEffect } from "react"
 import {
   HeartPulse,
@@ -10,7 +10,7 @@ import {
   Bell,
   PanelLeftClose,
   PanelLeftOpen,
-  LayoutDashboard,
+  LayoutDashboard,  // ✅ AJOUTER CET IMPORT
   Users,
   CalendarDays,
   BookOpen,
@@ -18,7 +18,8 @@ import {
   Calendar,
   Menu,
   X,
-  ChevronDown
+  ChevronDown,
+  FileSpreadsheet  // ✅ AJOUTER CET IMPORT
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -40,35 +41,50 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
   const userRole = role || (accent === "student" ? "student" : "admin")
   const isStudent = userRole === "student"
 
+  // Utiliser navItems passé en props, sinon utiliser les items par défaut
+  const defaultNavItems = isStudent
+    ? [
+        { label: "Mon espace", path: "/student/dashboard", icon: BookOpen },
+        { label: "Cours & Vidéos", path: "/student/courses", icon: BookOpen },
+      ]
+    : [
+        { label: "Tableau de bord", path: "/admin/dashboard", icon: LayoutDashboard },
+        { label: "Comptes", path: "/admin/accounts", icon: Users },
+        { label: "Logigrammes", path: "/admin/logigrammes", icon: CalendarDays },
+        { label: "Gestion des contrôles", path: "/admin/controls", icon: FileSpreadsheet },
+        { label: "Filières", path: "/admin/filieres", icon: BookOpen },
+        { label: "Cours & Vidéos", path: "/admin/courses", icon: BookOpen },
+        { label: "Formateurs", path: "/admin/formateurs", icon: GraduationCap },
+        { label: "Années", path: "/admin/academic-years", icon: Calendar },
+      ]
+
+  // Utiliser navItems s'il est passé, sinon les items par défaut
+  const itemsToUse = navItems && navItems.length > 0 ? navItems : defaultNavItems
+
+  // Organiser les items en sections
   const menuSections = isStudent
     ? [
-      {
-        title: "Espace Étudiant",
-        items: [
-          { label: "Mon espace", path: "/student/dashboard", icon: BookOpen },
-          { label: "Cours & Vidéos", path: "/student/courses", icon: BookOpen },
-        ],
-      },
-    ]
+        {
+          title: "Espace Étudiant",
+          items: itemsToUse,
+        },
+      ]
     : [
-      {
-        title: "Gestion",
-        items: [
+        {
+           title: "Gestion",
+          items: [
           { label: "Tableau de bord", path: "/admin/dashboard", icon: LayoutDashboard },
           { label: "Comptes", path: "/admin/accounts", icon: Users },
-        ],
-      },
-      {
-        title: "Pédagogie",
-        items: [
-          { label: "Logigrammes", path: "/admin/logigrammes", icon: CalendarDays },
-          { label: "Filières", path: "/admin/filieres", icon: BookOpen },
-          { label: "Cours & Vidéos", path: "/admin/courses", icon: BookOpen },
-          { label: "Formateurs", path: "/admin/formateurs", icon: GraduationCap },
-          { label: "Années", path: "/admin/academic-years", icon: Calendar },
-        ],
-      },
-    ]
+          { label: "Gestion des contrôles", path: "/admin/controls", icon: FileSpreadsheet }
+          ],
+        },
+        {
+          title: "Pédagogie",
+          items: itemsToUse.filter(item => 
+            ['Logigrammes', 'Filières', 'Cours & Vidéos', 'Formateurs', 'Années'].includes(item.label)
+          ),
+        },
+      ]
 
   useEffect(() => {
     localStorage.setItem('sidebar-collapsed', isCollapsed.toString());
@@ -140,7 +156,7 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
           <nav className="flex flex-col gap-4 flex-1 overflow-y-auto custom-scrollbar">
             {menuSections.map((section) => (
               <div key={section.title} className="flex flex-col gap-1">
-                {(!isCollapsed || isMobileOpen) && (
+                {(!isCollapsed || isMobileOpen) && section.items.length > 0 && (
                   <p className="px-2 mb-0.5 text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 animate-in fade-in duration-300">
                     {section.title}
                   </p>
@@ -191,7 +207,6 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
                 </div>
               </div>
             )}
-            {/* OLD TOGGLE BUTTON REMOVED FROM HERE */}
           </div>
         </aside>
 
@@ -200,7 +215,6 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
           {/* Compact header */}
           <header className="sticky top-0 z-20 flex h-20 items-center justify-between border-b border-slate-100 bg-white px-6 shadow-sm">
             <div className="flex items-center gap-4">
-              {/* NEW TOGGLE BUTTON (desktop only) */}
               <button
                 type="button"
                 onClick={() => setIsCollapsed(!isCollapsed)}
@@ -210,7 +224,6 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
                 {isCollapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
               </button>
 
-              {/* Mobile menu button */}
               <button
                 type="button"
                 onClick={() => setIsMobileOpen(true)}
@@ -220,7 +233,6 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
                 <Menu className="size-4" />
               </button>
 
-              {/* Title and subtitle */}
               <div className="flex flex-col">
                 <h1 className="text-lg md:text-xl font-bold tracking-tight text-slate-800 font-heading leading-tight">{title}</h1>
                 {subtitle && <p className="text-[11px] font-medium text-slate-500 hidden sm:block mt-0.5 leading-normal">{subtitle}</p>}
@@ -285,7 +297,6 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
             </div>
           </header>
 
-          {/* Content area with responsive padding for breathing room */}
           <div className="w-full px-4 md:px-6 py-6 flex-1 overflow-y-auto overflow-x-hidden">
             {children}
           </div>

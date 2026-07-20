@@ -8,6 +8,7 @@ import { requireAuth, requireRole, requireServiceRole, getRole } from "./lib/aut
 import logigrammesRouter from "./routes/logigrammes.js"
 import completionRouter from "./routes/completion.js"
 import filieresRouter from "./routes/filieres.js"
+import controlsRoutes from './routes/controles.js';
 import formateursRouter from "./routes/formateurs.js"
 import yearsRouter from "./routes/academic-years.js"
 import coursesRouter from "./routes/courses.js"
@@ -48,12 +49,13 @@ app.get("/api/me", requireAuth, (req, res) => {
 // Admin — Logigramme & Completion
 // ---------------------------------------------------------------------------
 
-app.use("/api/logigramme", requireAuth, requireRole("admin"), logigrammesRouter)
-app.use("/api/completion", requireAuth, requireRole("admin"), completionRouter)
-app.use("/api/filieres", requireAuth, filieresRouter)
-app.use("/api/formateurs", requireAuth, requireRole("admin"), formateursRouter)
-app.use("/api/years", requireAuth, requireRole("admin"), yearsRouter)
-app.use("/api/courses", requireAuth, coursesRouter)
+app.use("/api/logigramme", requireAuth, requireRole("admin"), logigrammesRouter);
+app.use("/api/completion", requireAuth, requireRole("admin"), completionRouter);
+app.use("/api/filieres", requireAuth, filieresRouter);
+app.use('/api/controles', controlsRoutes);
+app.use("/api/formateurs", requireAuth, requireRole("admin"), formateursRouter);
+app.use("/api/years", requireAuth, requireRole("admin"), yearsRouter);
+app.use("/api/courses", requireAuth, coursesRouter);
 
 // ---------------------------------------------------------------------------
 // Student — Read-only Logigramme

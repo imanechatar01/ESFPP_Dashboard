@@ -191,7 +191,7 @@ export function AccountManagement({ path, navigate }) {
     <DashboardShell
       title="Gestion des comptes"
       subtitle="Gerez les acces et surveillez l'onboarding des utilisateurs."
-      navItems={navItems}
+      
       activePath={path}
       navigate={navigate}
     >

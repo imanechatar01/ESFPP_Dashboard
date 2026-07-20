@@ -100,7 +100,7 @@ export default function AcademicYears({ path, navigate }) {
     <DashboardShell
       title="Années Académiques"
       subtitle="Gérez les cycles annuels et la structure des calendriers."
-      navItems={navItems}
+    
       activePath={path}
       navigate={navigate}
     >

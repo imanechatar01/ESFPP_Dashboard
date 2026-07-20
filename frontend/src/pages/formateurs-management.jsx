@@ -158,7 +158,7 @@ export default function FormateursManagement({ path, navigate }) {
     <DashboardShell
       title="Gestion des Formateurs"
       subtitle="Gérez l'affectation des enseignants aux unités de formation."
-      navItems={navItems}
+      
       activePath={path}
       navigate={navigate}
     >
