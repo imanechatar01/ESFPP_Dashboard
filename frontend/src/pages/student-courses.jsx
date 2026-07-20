@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils"
 
 const navItems = [
   { label: "Mon espace", path: "/student/dashboard", icon: BookOpen },
+  { label: "Cours & Vidéos", path: "/student/courses", icon: Video },
 ]
 
 /**
@@ -99,6 +100,9 @@ function ScoreCompletedCard({ scoreData, courseTitle }) {
 
 export function StudentCourses({ path, navigate }) {
   const { user } = useAuth()
+  const userId = user?.id
+  const userFiliereId = user?.user_metadata?.filiere_id
+  const userClasseId = user?.user_metadata?.classe_id
   const [courses, setCourses] = useState([])
   const [filieres, setFilieres] = useState([])
   const [selectedFiliereId, setSelectedFiliereId] = useState("")
@@ -114,20 +118,23 @@ export function StudentCourses({ path, navigate }) {
   const [scores, setScores] = useState({})
   const [savingScore, setSavingScore] = useState(false)
 
-  // Progress map: { [course_id]: { watched_seconds, duration_seconds, percentage } }
-  const [progress, setProgress] = useState({})
-
-  // Fetch initial data + scores + progress
+  // Fetch initial data and H5P evaluation scores
   useEffect(() => {
+    if (!userId) return
+
+    let cancelled = false
+
     async function loadData() {
       setLoading(true)
+      setError("")
       try {
-        const [coursesData, filieresData, scoresData, progressData] = await Promise.all([
+        const [coursesData, filieresData, scoresData] = await Promise.all([
           apiRequest("/api/courses"),
           apiRequest("/api/filieres"),
           apiRequest("/api/courses/scores"),
-          apiRequest("/api/courses/progress"),
         ])
+        if (cancelled) return
+
         setCourses(coursesData)
         setFilieres(filieresData)
 
@@ -138,16 +145,7 @@ export function StudentCourses({ path, navigate }) {
         }
         setScores(scoresMap)
 
-        // Build progress map
-        const progressMap = {}
-        for (const p of progressData) {
-          progressMap[p.course_id] = p
-        }
-        setProgress(progressMap)
-
         // Try to autofilter based on student's metadata if available
-        const userFiliereId = user?.user_metadata?.filiere_id
-        const userClasseId = user?.user_metadata?.classe_id
         if (userFiliereId) {
           setSelectedFiliereId(userFiliereId)
           if (userClasseId) {
@@ -155,13 +153,18 @@ export function StudentCourses({ path, navigate }) {
           }
         }
       } catch (err) {
+        if (cancelled) return
         setError("Erreur de chargement: " + err.message)
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
     loadData()
-  }, [user])
+
+    return () => {
+      cancelled = true
+    }
+  }, [userId, userFiliereId, userClasseId])
 
   // Update classes select options when filiere changes
   useEffect(() => {
@@ -173,35 +176,6 @@ export function StudentCourses({ path, navigate }) {
     const filiere = filieres.find(f => f.id === selectedFiliereId)
     setClasses(filiere?.classes || [])
   }, [selectedFiliereId, filieres])
-
-  // Save video playback progress
-  const saveProgress = useCallback(async (courseId, watchedSeconds, durationSeconds) => {
-    const percentage = durationSeconds > 0 ? Math.round((watchedSeconds / durationSeconds) * 100) : 0
-
-    // Optimistically update local progress state
-    setProgress(prev => ({
-      ...prev,
-      [courseId]: {
-        course_id: courseId,
-        watched_seconds: watchedSeconds,
-        duration_seconds: durationSeconds,
-        percentage
-      }
-    }))
-
-    try {
-      await apiRequest(`/api/courses/${courseId}/progress`, {
-        method: "POST",
-        body: JSON.stringify({
-          watched_seconds: watchedSeconds,
-          duration_seconds: durationSeconds,
-          percentage
-        })
-      })
-    } catch (err) {
-      console.error("Failed to save playback progress:", err.message)
-    }
-  }, [])
 
   // Save H5P evaluation score
   const saveScore = useCallback(async (courseId, score, maxScore, percentage) => {
@@ -223,28 +197,19 @@ export function StudentCourses({ path, navigate }) {
         [courseId]: result,
       }))
 
-      // Force progress to 100% in progress table to sync completion status
-      const courseDuration = activeVideo?.duration && Number(activeVideo.duration) > 0
-        ? Number(activeVideo.duration)
-        : 180
-      await saveProgress(courseId, courseDuration, courseDuration)
     } catch (err) {
       if (err.message?.includes("already recorded")) {
         setScores(prev => ({
           ...prev,
           [courseId]: { score, max_score: maxScore, percentage },
         }))
-        const courseDuration = activeVideo?.duration && Number(activeVideo.duration) > 0
-          ? Number(activeVideo.duration)
-          : 180
-        await saveProgress(courseId, courseDuration, courseDuration)
       } else {
         console.error("Failed to save score:", err.message)
       }
     } finally {
       setSavingScore(false)
     }
-  }, [scores, saveProgress, activeVideo])
+  }, [scores])
 
   // xAPI message listener for H5P score capture
   useEffect(() => {
@@ -255,9 +220,10 @@ export function StudentCourses({ path, navigate }) {
     const courseId = activeVideo.id
 
     function handleMessage(event) {
-      console.log("Captured postMessage event:", event.origin, event.data)
       try {
         let data = event.data
+
+        if (data?.type !== "esfpp-h5p-xapi") return
 
         if (typeof data === "string") {
           try {
@@ -277,17 +243,15 @@ export function StudentCourses({ path, navigate }) {
 
         const verbId = statement.verb?.id || ""
         const verbDisplay = statement.verb?.display?.["en-US"] || ""
+        const isSubContent = statement.object?.id?.includes("subContentId")
 
         const isCompletion =
           verbId.includes("completed") ||
-          verbId.includes("answered") ||
-          verbId.includes("scored") ||
           verbId.includes("passed") ||
           verbDisplay.toLowerCase() === "completed" ||
-          verbDisplay.toLowerCase() === "answered" ||
           verbDisplay.toLowerCase() === "passed"
 
-        if (!isCompletion) return
+        if (!isCompletion || isSubContent) return
 
         const scoreObj = statement.result?.score
         if (!scoreObj) return
@@ -307,7 +271,6 @@ export function StudentCourses({ path, navigate }) {
         const finalRaw = raw ?? Math.round((pct * 10) / 100)
         const finalMax = max ?? 10
 
-        console.log("Parsed H5P completion details:", { finalRaw, finalMax, pct })
         saveScore(courseId, finalRaw, finalMax, pct)
       } catch (err) {
         console.error("Error parsing H5P message:", err)
@@ -317,44 +280,6 @@ export function StudentCourses({ path, navigate }) {
     window.addEventListener("message", handleMessage)
     return () => window.removeEventListener("message", handleMessage)
   }, [activeVideo, scores, saveScore])
-
-  // Active timer to track time spent on H5P courses (estimated video progress)
-  useEffect(() => {
-    if (!activeVideo) return
-    if (!isH5PCourse(activeVideo.video_url)) return
-
-    const courseId = activeVideo.id
-    // Don't track if already completed
-    if (scores[courseId]) return
-
-    // Read the starting time once on mount of activeVideo
-    const currentProgress = progress[courseId]
-    let seconds = currentProgress?.watched_seconds ? Number(currentProgress.watched_seconds) : 0
-
-    // Use course's defined duration or fall back to 180 seconds (3 mins) if not set/empty
-    const duration = activeVideo.duration && Number(activeVideo.duration) > 0
-      ? Number(activeVideo.duration)
-      : 180
-
-    let lastSavedSeconds = seconds
-    console.log("Starting H5P time-spent tracking at seconds:", seconds, "with target duration:", duration)
-
-    const timer = setInterval(() => {
-      seconds += 1
-
-      if (seconds - lastSavedSeconds >= 5) {
-        lastSavedSeconds = seconds
-        saveProgress(courseId, seconds, duration)
-      }
-    }, 1000)
-
-    return () => {
-      clearInterval(timer)
-      if (seconds > lastSavedSeconds) {
-        saveProgress(courseId, seconds, duration)
-      }
-    }
-  }, [activeVideo, scores, saveProgress])
 
   const filteredCourses = courses.filter(course => {
     const matchesSearch = course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -367,7 +292,6 @@ export function StudentCourses({ path, navigate }) {
   })
 
   const activeVideoScore = activeVideo ? scores[activeVideo.id] : null
-  const activeVideoProgress = activeVideo ? progress[activeVideo.id] : null
   const activeVideoIsH5P = activeVideo ? isH5PCourse(activeVideo.video_url) : false
 
   return (
@@ -447,7 +371,6 @@ export function StudentCourses({ path, navigate }) {
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {filteredCourses.map((course) => {
                 const courseScore = scores[course.id]
-                const courseProgress = progress[course.id]
                 const courseIsH5P = isH5PCourse(course.video_url)
                 const isCompleted = courseIsH5P && courseScore
 
@@ -514,33 +437,6 @@ export function StudentCourses({ path, navigate }) {
                           {course.description || "Consultez cette vidéo de formation en ligne."}
                         </p>
 
-                        {/* Progress Bar UI (Always visible for all cards) */}
-                        <div className="mt-4 space-y-1.5">
-                          <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-wider">
-                            <span className="text-slate-400">Progression</span>
-                            <span className={cn(
-                              isCompleted ? "text-emerald-600 font-extrabold" : "text-slate-500 font-bold"
-                            )}>
-                              {isCompleted ? "100% (Terminé)" : `${courseProgress ? Math.round(courseProgress.percentage) : 0}%`}
-                            </span>
-                          </div>
-                          <div className="w-full h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                            <div
-                              className={cn(
-                                "h-full rounded-full transition-all duration-300",
-                                isCompleted ? "bg-emerald-500" : "bg-primary"
-                              )}
-                              style={{
-                                width: `${isCompleted
-                                    ? 100
-                                    : courseProgress
-                                      ? Math.min(100, Math.round(courseProgress.percentage))
-                                      : 0
-                                  }%`
-                              }}
-                            />
-                          </div>
-                        </div>
                       </div>
 
                       <div className="mt-4 pt-4 border-t border-border/40 flex items-center justify-between text-[10px] text-muted-foreground/60 font-bold uppercase tracking-wider">
@@ -602,8 +498,6 @@ export function StudentCourses({ path, navigate }) {
             ) : (
               <CourseVideoPlayer
                 videoUrl={activeVideo.video_url}
-                resumeTime={activeVideoProgress?.watched_seconds ? Number(activeVideoProgress.watched_seconds) : 0}
-                onProgress={(watched, duration) => saveProgress(activeVideo.id, watched, duration)}
               />
             )}
 

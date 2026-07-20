@@ -69,75 +69,6 @@ router.post('/:courseId/score', async (req, res) => {
   }
 });
 
-// GET /api/courses/progress
-// Returns playback progress for all courses of the authenticated student
-router.get('/progress', async (req, res) => {
-  try {
-    const { data, error } = await supabaseAdmin
-      .from('course_progress')
-      .select('course_id, watched_seconds, duration_seconds, percentage, updated_at')
-      .eq('student_id', req.user.id);
-
-    if (error) throw error;
-
-    res.json(data || []);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// POST /api/courses/:courseId/progress
-// Save or update playback progress for a course
-router.post('/:courseId/progress', async (req, res) => {
-  const { courseId } = req.params;
-  const { watched_seconds, duration_seconds, percentage } = req.body;
-
-  if (watched_seconds == null || duration_seconds == null || percentage == null) {
-    return res.status(400).json({ error: 'watched_seconds, duration_seconds and percentage are required' });
-  }
-
-  try {
-    const { data, error } = await supabaseAdmin
-      .from('course_progress')
-      .upsert({
-        student_id: req.user.id,
-        course_id: courseId,
-        watched_seconds: Number(watched_seconds),
-        duration_seconds: Number(duration_seconds),
-        percentage: Number(percentage),
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'student_id,course_id'
-      })
-      .select('course_id, watched_seconds, duration_seconds, percentage, updated_at')
-      .single();
-
-    if (error) throw error;
-
-    // Dynamically update the course duration in the courses table if it changed.
-    // We only update the 'duration' column, ensuring we never update or overwrite 'video_url'.
-    const roundedDuration = Math.round(Number(duration_seconds));
-    if (roundedDuration > 0) {
-      const { data: course } = await supabaseAdmin
-        .from('courses')
-        .select('duration')
-        .eq('id', courseId)
-        .single();
-      
-      if (course && course.duration !== roundedDuration) {
-        await supabaseAdmin
-          .from('courses')
-          .update({ duration: roundedDuration })
-          .eq('id', courseId);
-      }
-    }
-
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // ---------------------------------------------------------------------------
 // Courses CRUD
 // ---------------------------------------------------------------------------
@@ -176,7 +107,7 @@ router.get('/', async (req, res) => {
 // POST /api/courses
 // Admin only
 router.post('/', requireRole('admin'), async (req, res) => {
-  const { title, description, video_url, filiere_id, classe_id, duration } = req.body;
+  const { title, description, video_url, filiere_id, classe_id } = req.body;
 
   if (!title || !video_url) {
     return res.status(400).json({ error: 'Title and Video URL are required' });
@@ -190,8 +121,7 @@ router.post('/', requireRole('admin'), async (req, res) => {
         description,
         video_url,
         filiere_id: filiere_id || null,
-        classe_id: classe_id || null,
-        duration: duration != null ? Number(duration) : 300
+        classe_id: classe_id || null
       })
       .select(`
         *,
@@ -212,7 +142,7 @@ router.post('/', requireRole('admin'), async (req, res) => {
 // Admin only
 router.put('/:id', requireRole('admin'), async (req, res) => {
   const { id } = req.params;
-  const { title, description, video_url, filiere_id, classe_id, duration } = req.body;
+  const { title, description, video_url, filiere_id, classe_id } = req.body;
 
   if (!title || !video_url) {
     return res.status(400).json({ error: 'Title and Video URL are required' });
@@ -226,8 +156,7 @@ router.put('/:id', requireRole('admin'), async (req, res) => {
         description,
         video_url,
         filiere_id: filiere_id || null,
-        classe_id: classe_id || null,
-        duration: duration != null ? Number(duration) : 300
+        classe_id: classe_id || null
       })
       .eq('id', id)
       .select(`
