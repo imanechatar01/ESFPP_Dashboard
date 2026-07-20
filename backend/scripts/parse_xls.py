@@ -116,6 +116,21 @@ def check_keyword(val_str, keywords):
     return any(k in normalized for k in keywords)
 
 
+# TIF / TIFF must be matched as a whole word only.
+# Plain substring "tif" hits common French words: Actif, Certificatif, Objectif…
+# This helper uses a strict word-boundary regex to avoid false positives.
+_TIFF_RE = re.compile(
+    r'\b(tiff?|travaux\s+individuels?\s+de\s+formation)\b',
+    re.IGNORECASE,
+)
+
+
+def check_tiff_keyword(val_str):
+    """Return True only if val_str explicitly names a TIF/TIFF week."""
+    normalized = normalize_label(val_str)
+    return bool(_TIFF_RE.search(normalized))
+
+
 # ---------------------------------------------------------------------------
 # SHEET VALIDATION (preserved from original)
 # ---------------------------------------------------------------------------
@@ -303,11 +318,20 @@ def parse_xls(file_path, sheet_name, book=None):
         for r in range(data_start_row, sheet.nrows):
             unit_num_cell = sheet.cell(r, 0)
             unit_name_cell = sheet.cell(r, 1)
+            # Skip fully-empty rows.
             if (unit_num_cell.ctype == xlrd.XL_CELL_EMPTY and
                     unit_name_cell.ctype == xlrd.XL_CELL_EMPTY):
                 continue
+            # Stop at the Total row.
             if "total" in normalize_label(str(sheet.cell(r, 2).value)):
                 break
+            # Skip legend / footer rows that have no unit number in col 0.
+            # These are the colour-key rows at the bottom of the sheet
+            # (e.g. "Vacance", "Semaine d'examens", "Travaux Individuels…").
+            # Without this guard their text bleeds into column_overrides and
+            # marks every column in the sheet as vacation/exam/tiff.
+            if unit_num_cell.ctype == xlrd.XL_CELL_EMPTY:
+                continue
 
             valid_rows_count += 1
             cell = sheet.cell(r, col_idx)
@@ -317,7 +341,7 @@ def parse_xls(file_path, sheet_name, book=None):
                 has_vacation_text = True
             elif check_keyword(val_str, ["examen", "semaine d'examen", "semaine exam"]):
                 has_exam_text = True
-            elif check_keyword(val_str, ["tif", "travaux individ"]):
+            elif check_tiff_keyword(val_str):
                 has_tiff_text = True
 
             xf = book.xf_list[cell.xf_index]
@@ -371,7 +395,7 @@ def parse_xls(file_path, sheet_name, book=None):
         unit_lower = unit_name.lower()
         if any(skip in unit_lower for skip in ["vacance", "examen", "travaux individuels"]):
             continue
-        if re.search(r'\btiff?\b', unit_lower):
+        if check_tiff_keyword(unit_lower):
             continue
 
         # Formateur with merged-cell forward-fill (col 2)
@@ -411,7 +435,7 @@ def parse_xls(file_path, sheet_name, book=None):
                 cell_type = "vacation"
             elif check_keyword(val_str, ["examen", "semaine d'examen", "semaine exam"]):
                 cell_type = "exam"
-            elif check_keyword(val_str, ["tif", "travaux individ"]):
+            elif check_tiff_keyword(val_str):
                 cell_type = "tiff"
 
             # 3. Positive numeric → normal session (regardless of colour)

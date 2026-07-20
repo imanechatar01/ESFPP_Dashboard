@@ -217,7 +217,9 @@ router.get('/:id/unites', async (req, res) => {
           }
           conflictsMap[cell.semaine].programmes.push({
             logigramme_id: unit.logigramme_id,
-            label: `${unit.logigramme.filiere.name} — ${unit.logigramme.classe.label}`,
+            label: unit.logigramme 
+              ? `${unit.logigramme.filiere?.name || 'Inconnu'} — ${unit.logigramme.classe?.label || 'Inconnu'}`
+              : 'Programme Inconnu',
             unite_nom: unit.nom
           });
         }

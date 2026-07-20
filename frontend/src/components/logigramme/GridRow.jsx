@@ -1,6 +1,6 @@
 import { GridCell } from './GridCell';
 
-export function GridRow({ unite, rowIndex, weeksCount = 52, onToggleCell, onCreateCell, highlightWeeks = [] }) {
+export function GridRow({ unite, rowIndex, weeksCount = 52, onToggleCell, onContextMenu, highlightWeeks = [] }) {
   const { nom, formateur, vhg, vh_realise, cells } = unite;
   const taux = vhg > 0 ? (vh_realise / vhg) * 100 : 0;
 
@@ -38,7 +38,7 @@ export function GridRow({ unite, rowIndex, weeksCount = 52, onToggleCell, onCrea
             cell={cell}
             semaine={idx + 1}
             onToggle={onToggleCell}
-            onCreateCell={onCreateCell ? (semaine, heures) => onCreateCell(unite.id, semaine, heures) : undefined}
+            onContextMenu={onContextMenu ? (e, semaine, cell) => onContextMenu(e, unite, semaine, cell) : undefined}
             isHighlighted={cell && highlightWeeks.includes(cell.semaine)}
           />
         ))}
@@ -48,7 +48,7 @@ export function GridRow({ unite, rowIndex, weeksCount = 52, onToggleCell, onCrea
       <div className="sticky right-0 z-20 w-24 h-12 bg-white border-b border-l border-slate-300 flex items-center px-2 group-hover:bg-slate-50 transition-colors select-none flex-shrink-0">
         <div className="w-full">
            <div className="flex justify-between text-[9px] font-black text-slate-700 mb-0.5">
-             <span>{Math.round(vh_realise)}h / {vhg}h</span>
+             <span>{Number(vh_realise.toFixed(1))}h / {vhg}h</span>
              <span className={completionPercentage >= 100 ? 'text-emerald-600' : ''}>{completionPercentage}%</span>
            </div>
            <div className="text-[8px] font-extrabold text-slate-400 uppercase mb-1">

@@ -1,7 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiRequest } from '../lib/api';
 import { supabase } from '../supabaseClient';
+import { useLogigrammeContext } from '../contexts/logigramme-context';
 
+// ---------------------------------------------------------------------------
+// Local helper: derive computed metrics for a single unite from its cells.
+// This is used ONLY for the grid display (unit-level taux, vh_realise, etc.)
+// and NOT for the global KPI bar — those are handled by the server.
+// ---------------------------------------------------------------------------
 const calculateUnitMetrics = (unit) => {
   const cells = unit?.cells || [];
   const plannedHours = cells
@@ -27,6 +33,10 @@ export function useLogigramme(logigrammeId) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const subscriptionRef = useRef(null);
+
+  // refreshKpis triggers one clean server-side fetch of the aggregated KPIs.
+  // It is the ONLY way KPI values are written — no manual delta arithmetic.
+  const { refreshKpis } = useLogigrammeContext();
 
   const fetchLogigramme = useCallback(async () => {
     if (!logigrammeId) return;
@@ -81,7 +91,7 @@ export function useLogigramme(logigrammeId) {
         },
         (payload) => {
           console.log('[useLogigramme] Real-time update received:', payload);
-          // Update state with new/modified cell
+          // Update the grid state with the new/modified cell
           setData(prev => {
             if (!prev) return prev;
 
@@ -91,10 +101,8 @@ export function useLogigramme(logigrammeId) {
 
               let nextCells;
               if (payload.eventType === 'DELETE') {
-                // Remove deleted cell
                 nextCells = u.cells.filter(c => c.id !== payload.old.id);
               } else {
-                // INSERT or UPDATE
                 const existingIndex = u.cells.findIndex(c => c.id === payload.new.id);
                 if (existingIndex >= 0) {
                   nextCells = [...u.cells];
@@ -109,6 +117,9 @@ export function useLogigramme(logigrammeId) {
 
             return { ...prev, unites: nextUnites };
           });
+
+          // Refresh KPIs from the server after a real-time DB change
+          refreshKpis();
         }
       )
       .subscribe();
@@ -124,12 +135,16 @@ export function useLogigramme(logigrammeId) {
     };
   }, [logigrammeId]);
 
+  // ---------------------------------------------------------------------------
+  // toggleCell — left-click to mark a cell done/pending
+  // Grid: optimistic update immediately.
+  // KPIs: refreshed from server once the API call succeeds.
+  // ---------------------------------------------------------------------------
   const toggleCell = async (cellId, currentStatus) => {
-    // 'done' and 'auto_done' both show the checkmark — toggling either sets to 'pending'
     const isDone = currentStatus === 'done' || currentStatus === 'auto_done';
     const nextStatus = isDone ? 'pending' : 'done';
 
-    // Optimistic UI update — apply immediately, no waiting for server
+    // Optimistic UI update for the grid
     setData(prev => {
       if (!prev) return prev;
       const nextUnites = prev.unites.map(u => {
@@ -146,19 +161,21 @@ export function useLogigramme(logigrammeId) {
         method: 'POST',
         body: JSON.stringify({ status: nextStatus })
       });
-      // ✅ Do NOT call fetchLogigramme() here — it would overwrite the optimistic update
-      // and cause the 3-second revert. The DB write is the source of truth;
-      // the next full page load will reflect the saved state.
+      // After a successful server write, refresh KPIs with the accurate aggregated values
+      refreshKpis();
     } catch (err) {
-      // On failure, revert by re-fetching real state from DB
       console.error('[useLogigramme] toggleCell failed, reverting:', err.message);
       fetchLogigramme();
       throw err;
     }
   };
 
-  const createCell = async (uniteId, semaine, heures) => {
-    // Determine completion_status based on auto_done logic (same as backend)
+  // ---------------------------------------------------------------------------
+  // actionCell — context menu: set cell type + hours
+  // Grid: optimistic update immediately.
+  // KPIs: refreshed from server once the API call succeeds.
+  // ---------------------------------------------------------------------------
+  const actionCell = async (uniteId, semaine, cell_type, heures = null) => {
     const today = new Date().toISOString().split('T')[0];
     const week = data?.weeks?.find(w => w.semaine === semaine);
     const isPast = week?.week_start_date && week.week_start_date < today;
@@ -168,7 +185,9 @@ export function useLogigramme(logigrammeId) {
     let isUpdate = false;
     let oldCell = null;
 
-    // Optimistic UI update
+    const isDelete = cell_type === 'empty' || (cell_type === 'normal' && (heures === null || heures === undefined || heures === ''));
+
+    // Optimistic UI update for the grid
     setData(prev => {
       if (!prev) return prev;
       const nextUnites = prev.unites.map(u => {
@@ -180,24 +199,24 @@ export function useLogigramme(logigrammeId) {
         if (existingCellIndex >= 0) {
           isUpdate = true;
           oldCell = u.cells[existingCellIndex];
-          if (heures === null || heures === undefined) {
+          if (isDelete) {
             nextCells = u.cells.filter(c => c.semaine !== semaine);
           } else {
             nextCells = [...u.cells];
             nextCells[existingCellIndex] = {
               ...oldCell,
+              cell_type,
               heures,
-              // Keep existing ID so toggle still works while saving
             };
           }
         } else {
-          if (heures === null || heures === undefined) {
+          if (isDelete) {
             return u;
           }
           const optimisticCell = {
             id: tempId,
             semaine,
-            cell_type: 'normal',
+            cell_type,
             heures,
             week_start_date: week?.week_start_date || null,
             completion_status: completionStatus,
@@ -216,13 +235,13 @@ export function useLogigramme(logigrammeId) {
         body: JSON.stringify({
           unite_id: uniteId,
           semaine,
-          cell_type: 'normal',
+          cell_type,
           heures,
         })
       });
 
-      // If it was a new cell, replace temporary cell with real DB cell (update the id)
-      if (!isUpdate && heures !== null && heures !== undefined) {
+      // Replace temp id with real DB id for new cells
+      if (!isUpdate && !isDelete && savedCell && savedCell.id) {
         setData(prev => {
           if (!prev) return prev;
           const nextUnites = prev.unites.map(u => {
@@ -237,22 +256,26 @@ export function useLogigramme(logigrammeId) {
           return { ...prev, unites: nextUnites };
         });
       }
+
+      // Refresh KPIs from the server with the accurate aggregated values
+      refreshKpis();
     } catch (err) {
-      // Rollback
-      console.error('[useLogigramme] createCell failed, reverting:', err.message);
+      // Rollback optimistic update
+      console.error('[useLogigramme] actionCell failed, reverting:', err.message);
       setData(prev => {
         if (!prev) return prev;
         const nextUnites = prev.unites.map(u => {
           if (u.id !== uniteId) return u;
           let nextCells;
           if (isUpdate) {
-            // Restore old cell
-            nextCells = u.cells.map(c => c.semaine === semaine ? oldCell : c);
+            if (isDelete) {
+              nextCells = [...u.cells, oldCell];
+            } else {
+              nextCells = u.cells.map(c => c.semaine === semaine ? oldCell : c);
+            }
           } else {
-            // Remove optimistic cell
             nextCells = u.cells.filter(c => c.id !== tempId);
           }
-          
           return calculateUnitMetrics({ ...u, cells: nextCells });
         });
         return { ...prev, unites: nextUnites };
@@ -261,17 +284,46 @@ export function useLogigramme(logigrammeId) {
     }
   };
 
-  const markWeek = async (semaine, status) => {
-    try {
-      await apiRequest(`/api/completion/week`, {
-        method: 'POST',
-        body: JSON.stringify({ logigramme_id: logigrammeId, semaine, status })
+  // ---------------------------------------------------------------------------
+  // actionWeek — week-level context menu: clear week / mark all done
+  // Grid: optimistic update immediately.
+  // KPIs: refreshed from server once the API call succeeds.
+  // ---------------------------------------------------------------------------
+  const actionWeek = async (semaine, action) => {
+    // Optimistic UI update for the grid
+    setData(prev => {
+      if (!prev) return prev;
+      const nextUnites = prev.unites.map(u => {
+        let nextCells = u.cells;
+        if (action === 'clear') {
+          nextCells = u.cells.filter(c => c.semaine !== semaine);
+        } else if (action === 'mark_done') {
+          nextCells = u.cells.map(c =>
+            (c.semaine === semaine && c.cell_type === 'normal')
+              ? { ...c, completion_status: 'done' }
+              : c
+          );
+        }
+        return calculateUnitMetrics({ ...u, cells: nextCells });
       });
+      return { ...prev, unites: nextUnites };
+    });
+
+    try {
+      await apiRequest(`/api/logigramme/week/action`, {
+        method: 'POST',
+        body: JSON.stringify({ logigramme_id: logigrammeId, semaine, action })
+      });
+      // actionWeek already calls fetchLogigramme() to resync the full grid;
+      // also refresh KPIs from the server.
       fetchLogigramme();
+      refreshKpis();
     } catch (err) {
+      console.error('[useLogigramme] actionWeek failed, reverting:', err.message);
+      fetchLogigramme();
       throw err;
     }
   };
 
-  return { data, loading, error, toggleCell, createCell, markWeek, refresh: fetchLogigramme };
+  return { data, loading, error, toggleCell, actionCell, actionWeek, refresh: fetchLogigramme };
 }

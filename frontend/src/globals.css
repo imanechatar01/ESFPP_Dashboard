@@ -163,50 +163,154 @@
   }
 }
 
-/* Print Styles */
+/* Hide print-only components on screen; @media print will reveal them */
+.print-only {
+  display: none;
+}
+
+/* ── Print Styles ──────────────────────────────────────────────────────────── */
+@page {
+  /* A4 landscape gives ~277mm x 190mm usable area with 10mm margins.
+     This is the most universally supported print size. */
+  size: A4 landscape;
+  margin: 8mm 10mm;
+}
+
 @media print {
-  .no-print, 
-  aside, 
+  /* 1. Hide all screen-only UI */
+  .no-print,
+  aside,
   header,
-  .filter-bar { 
-    display: none !important; 
+  .filter-bar {
+    display: none !important;
   }
-  
+
+  /* 2. Reset layout containers so the page flows naturally */
+  html, body, #root {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: white !important;
+    font-size: 8pt !important;
+  }
+
+  /* 3. The DashboardShell <main> wrapper — flatten the grid layout */
   main {
+    display: block !important;
     padding: 0 !important;
     margin: 0 !important;
-    background: white !important;
-  }
-
-  .mx-auto {
-    max-width: none !important;
-    padding: 0 !important;
-  }
-
-  /* Expand grid */
-  .overflow-x-auto {
+    height: auto !important;
+    min-height: 0 !important;
     overflow: visible !important;
   }
-  
-  .max-h-\[70vh\] {
+
+  /* 4. The inner grid div inside DashboardShell */
+  main > div {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* 5. Content area inside the shell's <section> */
+  section {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* 6. The padding wrapper div that holds {children} */
+  section > div {
+    display: block !important;
+    padding: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* 7. The FormateurVue root wrapper */
+  .space-y-6 {
+    display: block !important;
+  }
+
+  /* 8. Show the print-only merged table, hide screen-only tables */
+  .print-only {
+    display: block !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* 8b. Force the table inside .print-only to fill the full page width */
+  .print-only table {
+    width: 100% !important;
+    max-width: 100% !important;
+    table-layout: fixed !important;
+    overflow: hidden !important;
+  }
+
+  /* 8c. Truncate overflowing text in label cells */
+  .print-only td,
+  .print-only th {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  /* 9. Hide ALL the screen-only FormateurVue elements
+        (the per-programme grids, the info banner, conflicts, legend wrapper)
+        Everything inside .space-y-6 except .print-only is hidden */
+  .space-y-6 > *:not(.print-only) {
+    display: none !important;
+  }
+
+  /* 10. Expand any remaining scroll containers */
+  .overflow-x-auto,
+  .overflow-y-auto {
+    overflow: visible !important;
+    height: auto !important;
     max-height: none !important;
   }
 
-  /* Unstick headers/columns for cleaner multipage print if needed */
+  /* 11. Prevent sticky positioning from clipping content */
   .sticky {
     position: static !important;
   }
 
-  /* But wait, Excel style often wants the first column. 
-     For simple window.print(), static is safer to avoid clipping. */
-  
-  .rounded-2xl {
-    border-radius: 0 !important;
+  /* 12. Row page-break safety */
+  tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
-  table, div {
-    break-inside: auto;
+  /* 13. Point 5 — Enforce visible table borders for print rendering.
+         Using absolute colours (not Tailwind tokens) to guarantee
+         they are not stripped or faded by the browser print engine. */
+  table {
+    border-collapse: collapse !important;
+    border: 2px solid #1e3a6e !important;
   }
+
+  th {
+    border: 1.5px solid #334155 !important;
+    background-color: #f0f4f8 !important;
+    color: #0f172a !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  td {
+    border: 1px solid #475569 !important;
+    color: #0f172a !important;
+  }
+
+  /* Ensure background colours (session/vacation/exam/tiff) print */
+  th, td {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+
 }
 
 /* Custom scrollbar styling */

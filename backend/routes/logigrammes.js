@@ -145,7 +145,9 @@ router.get('/kpis', async (req, res) => {
       total_programmes: uniqueLogIds.size,
       total_heures: Math.round(totalVhg),
       total_formateurs: uniqueFormateurIds.size,
-      taux_global: totalVhg > 0 ? totalRealise / totalVhg : 0
+      taux_global: totalVhg > 0 ? totalRealise / totalVhg : 0,
+      total_realise: totalRealise,
+      total_vhg: totalVhg
     });
   } catch (err) {
     console.error(err);
@@ -366,6 +368,79 @@ router.put('/:id/auto-complete', async (req, res) => {
   }
 });
 
+// POST /api/logigramme/week/action — Grouped action on an entire week
+router.post('/week/action', async (req, res) => {
+  const { logigramme_id, semaine, action } = req.body;
+  const userId = req.user.id;
+
+  if (!logigramme_id || !semaine || !action) {
+    return res.status(400).json({ error: 'logigramme_id, semaine, et action sont requis.' });
+  }
+
+  try {
+    // 1. Find all units for this logigramme
+    const { data: unites, error: unitesError } = await supabaseAdmin
+      .from('unites_formation')
+      .select('id')
+      .eq('logigramme_id', logigramme_id);
+
+    if (unitesError) throw unitesError;
+    const uniteIds = (unites || []).map(u => u.id);
+
+    if (uniteIds.length === 0) {
+      return res.json({ updated: 0, deleted: 0 });
+    }
+
+    if (action === 'mark_done') {
+      // Find all normal cells for this week/program
+      const { data: cells, error: cellsError } = await supabaseAdmin
+        .from('week_cells')
+        .select('id')
+        .eq('semaine', semaine)
+        .eq('cell_type', 'normal')
+        .in('unite_id', uniteIds);
+
+      if (cellsError) throw cellsError;
+      if (!cells || cells.length === 0) {
+        return res.json({ updated: 0, deleted: 0 });
+      }
+
+      const cellIds = cells.map(c => c.id);
+      const completionInserts = cellIds.map(id => ({
+        cell_id: id,
+        status: 'done',
+        updated_by: userId,
+        updated_at: new Date().toISOString()
+      }));
+
+      const { error: upsertError } = await supabaseAdmin
+        .from('completions')
+        .upsert(completionInserts, { onConflict: 'cell_id' });
+
+      if (upsertError) throw upsertError;
+      console.log(`[logigramme] Marked ${cellIds.length} cells as done for logigramme=${logigramme_id}, semaine=${semaine}`);
+      return res.json({ updated: cellIds.length, deleted: 0 });
+    } else if (action === 'clear') {
+      // Delete all cells (any type) for this week/program
+      const { data: deletedCells, error: deleteError } = await supabaseAdmin
+        .from('week_cells')
+        .delete()
+        .eq('semaine', semaine)
+        .in('unite_id', uniteIds)
+        .select('id');
+
+      if (deleteError) throw deleteError;
+      console.log(`[logigramme] Cleared ${(deletedCells || []).length} cells for logigramme=${logigramme_id}, semaine=${semaine}`);
+      return res.json({ updated: 0, deleted: (deletedCells || []).length });
+    } else {
+      return res.status(400).json({ error: 'Action non reconnue. Utilisez "mark_done" ou "clear".' });
+    }
+  } catch (err) {
+    console.error('[logigramme] Week action error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/logigramme/cell — Create or update a single week_cell
 router.post('/cell', async (req, res) => {
   const { unite_id, semaine, cell_type, heures } = req.body;
@@ -377,6 +452,7 @@ router.post('/cell', async (req, res) => {
   try {
     const hasHeures = heures !== undefined && heures !== null && String(heures).trim() !== '';
     const numericHeures = hasHeures ? Number(heures) : null;
+    const finalCellType = cell_type || 'normal';
 
     if (hasHeures && (!Number.isFinite(numericHeures) || numericHeures < 0)) {
       return res.status(400).json({ error: 'heures doit être un nombre positif ou nul.' });
@@ -407,7 +483,9 @@ router.post('/cell', async (req, res) => {
       return res.status(404).json({ error: `Semaine ${semaine} introuvable pour cette année académique.` });
     }
 
-    if (!hasHeures) {
+    const shouldDelete = finalCellType === 'empty' || (finalCellType === 'normal' && !hasHeures);
+
+    if (shouldDelete) {
       const { data: deletedCell, error: deleteError } = await supabaseAdmin
         .from('week_cells')
         .delete()
@@ -428,7 +506,7 @@ router.post('/cell', async (req, res) => {
       .upsert({
         unite_id,
         semaine,
-        cell_type: cell_type || 'normal',
+        cell_type: finalCellType,
         heures: numericHeures,
         week_start_date: weekRow.week_start_date
       }, { onConflict: 'unite_id, semaine' })
@@ -437,7 +515,7 @@ router.post('/cell', async (req, res) => {
 
     if (cellError) throw cellError;
 
-    console.log(`[logigramme] Upserted cell: unite=${unite_id}, semaine=${semaine}, heures=${numericHeures}`);
+    console.log(`[logigramme] Upserted cell: unite=${unite_id}, semaine=${semaine}, type=${finalCellType}, heures=${numericHeures}`);
     res.json(cell);
   } catch (err) {
     console.error('[logigramme] Cell upsert error:', err);
