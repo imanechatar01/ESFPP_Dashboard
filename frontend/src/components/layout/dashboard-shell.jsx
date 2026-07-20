@@ -52,19 +52,19 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
   // Utiliser navItems passé en props, sinon utiliser les items par défaut
   const defaultNavItems = isStudent
     ? [
-        { label: "Mon espace", path: "/student/dashboard", icon: BookOpen },
-        { label: "Cours & Vidéos", path: "/student/courses", icon: BookOpen },
-      ]
+      { label: "Mon espace", path: "/student/dashboard", icon: BookOpen },
+      { label: "Cours & Vidéos", path: "/student/courses", icon: BookOpen },
+    ]
     : [
-        { label: "Tableau de bord", path: "/admin/dashboard", icon: LayoutDashboard },
-        { label: "Comptes", path: "/admin/accounts", icon: Users },
-        { label: "Logigrammes", path: "/admin/logigrammes", icon: CalendarDays },
-        { label: "Gestion des contrôles", path: "/admin/controls", icon: FileSpreadsheet },
-        { label: "Filières", path: "/admin/filieres", icon: BookOpen },
-        { label: "Cours & Vidéos", path: "/admin/courses", icon: BookOpen },
-        { label: "Formateurs", path: "/admin/formateurs", icon: GraduationCap },
-        { label: "Années", path: "/admin/academic-years", icon: Calendar },
-      ]
+      { label: "Tableau de bord", path: "/admin/dashboard", icon: LayoutDashboard },
+      { label: "Comptes", path: "/admin/accounts", icon: Users },
+      { label: "Logigrammes", path: "/admin/logigrammes", icon: CalendarDays },
+      { label: "Gestion des contrôles", path: "/admin/controls", icon: FileSpreadsheet },
+      { label: "Filières", path: "/admin/filieres", icon: BookOpen },
+      { label: "Cours & Vidéos", path: "/admin/courses", icon: BookOpen },
+      { label: "Formateurs", path: "/admin/formateurs", icon: GraduationCap },
+      { label: "Années", path: "/admin/academic-years", icon: Calendar },
+    ]
 
   // Utiliser navItems s'il est passé, sinon les items par défaut
   const itemsToUse = navItems && navItems.length > 0 ? navItems : defaultNavItems
@@ -72,27 +72,27 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
   // Organiser les items en sections
   const menuSections = isStudent
     ? [
-        {
-          title: "Espace Étudiant",
-          items: itemsToUse,
-        },
-      ]
+      {
+        title: "Espace Étudiant",
+        items: itemsToUse,
+      },
+    ]
     : [
-        {
-           title: "Gestion",
-          items: [
+      {
+        title: "Gestion",
+        items: [
           { label: "Tableau de bord", path: "/admin/dashboard", icon: LayoutDashboard },
           { label: "Comptes", path: "/admin/accounts", icon: Users },
           { label: "Gestion des contrôles", path: "/admin/controls", icon: FileSpreadsheet }
-          ],
-        },
-        {
-          title: "Pédagogie",
-          items: itemsToUse.filter(item => 
-            ['Logigrammes', 'Filières', 'Cours & Vidéos', 'Formateurs', 'Années'].includes(item.label)
-          ),
-        },
-      ]
+        ],
+      },
+      {
+        title: "Pédagogie",
+        items: itemsToUse.filter(item =>
+          ['Logigrammes', 'Filières', 'Cours & Vidéos', 'Formateurs', 'Années'].includes(item.label)
+        ),
+      },
+    ]
 
   // Persist only the pinned state
   useEffect(() => {
@@ -179,11 +179,7 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
           <nav className="flex flex-col gap-4 flex-1 overflow-y-auto custom-scrollbar">
             {menuSections.map((section) => (
               <div key={section.title} className="flex flex-col gap-1">
-<<<<<<< HEAD
-                {(!isCollapsed || isMobileOpen) && section.items.length > 0 && (
-=======
-                {(sidebarOpen || isMobileOpen) && (
->>>>>>> main-1
+                {(sidebarOpen || isMobileOpen) && section.items.length > 0 && (
                   <p className="px-2 mb-0.5 text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 animate-in fade-in duration-300">
                     {section.title}
                   </p>
@@ -242,10 +238,6 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
           {/* Compact header */}
           <header className="sticky top-0 z-20 flex h-20 items-center justify-between border-b border-slate-100 bg-white px-6 shadow-sm">
             <div className="flex items-center gap-4">
-<<<<<<< HEAD
-=======
-              {/* Toggle button — click to pin/unpin, hover for 3-second preview */}
->>>>>>> main-1
               <button
                 type="button"
                 onClick={() => {
