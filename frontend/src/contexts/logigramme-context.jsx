@@ -67,6 +67,8 @@ export function LogigrammeProvider({ children }) {
       if (filters.year_id) query.append('year_id', filters.year_id);
       if (filters.filiere_id) query.append('filiere_id', filters.filiere_id);
       if (filters.formateur_id) query.append('formateur_id', filters.formateur_id);
+      if (filters.classe_id) query.append('classe_id', filters.classe_id);
+      if (filters.niveau_id) query.append('niveau_id', filters.niveau_id);
 
       const data = await apiRequest(`/api/logigramme/kpis?${query.toString()}`);
       setKpis(data);
@@ -75,7 +77,7 @@ export function LogigrammeProvider({ children }) {
     } finally {
       setLoadingKpis(false);
     }
-  }, [filters.year_id, filters.filiere_id, filters.formateur_id]);
+  }, [filters.year_id, filters.filiere_id, filters.formateur_id, filters.classe_id, filters.niveau_id]);
 
   useEffect(() => {
     fetchKpis();

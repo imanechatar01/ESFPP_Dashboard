@@ -170,10 +170,9 @@
 
 /* ── Print Styles ──────────────────────────────────────────────────────────── */
 @page {
-  /* A4 landscape gives ~277mm x 190mm usable area with 10mm margins.
-     This is the most universally supported print size. */
+  /* Force landscape page layout and slim margins */
   size: A4 landscape;
-  margin: 8mm 10mm;
+  margin: 5mm;
 }
 
 @media print {
@@ -181,6 +180,8 @@
   .no-print,
   aside,
   header,
+  nav,
+  sidebar,
   .filter-bar {
     display: none !important;
   }
