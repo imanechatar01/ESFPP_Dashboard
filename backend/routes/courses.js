@@ -69,56 +69,6 @@ router.post('/:courseId/score', async (req, res) => {
   }
 });
 
-// GET /api/courses/progress
-// Returns playback progress for all courses of the authenticated student
-router.get('/progress', async (req, res) => {
-  try {
-    const { data, error } = await supabaseAdmin
-      .from('course_progress')
-      .select('course_id, watched_seconds, duration_seconds, percentage, updated_at')
-      .eq('student_id', req.user.id);
-
-    if (error) throw error;
-
-    res.json(data || []);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// POST /api/courses/:courseId/progress
-// Save or update playback progress for a course
-router.post('/:courseId/progress', async (req, res) => {
-  const { courseId } = req.params;
-  const { watched_seconds, duration_seconds, percentage } = req.body;
-
-  if (watched_seconds == null || duration_seconds == null || percentage == null) {
-    return res.status(400).json({ error: 'watched_seconds, duration_seconds and percentage are required' });
-  }
-
-  try {
-    const { data, error } = await supabaseAdmin
-      .from('course_progress')
-      .upsert({
-        student_id: req.user.id,
-        course_id: courseId,
-        watched_seconds: Number(watched_seconds),
-        duration_seconds: Number(duration_seconds),
-        percentage: Number(percentage),
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'student_id,course_id'
-      })
-      .select('course_id, watched_seconds, duration_seconds, percentage, updated_at')
-      .single();
-
-    if (error) throw error;
-
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 // ---------------------------------------------------------------------------
 // Courses CRUD
