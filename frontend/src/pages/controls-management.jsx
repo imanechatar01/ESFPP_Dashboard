@@ -513,15 +513,17 @@ export function ControlsManagement({ path, navigate }) {
     const status = controle.computed_status || controle.statut
     
     const config = {
-      'done': { color: 'bg-emerald-100 text-emerald-700 border-emerald-300', icon: CheckCircle, label: '✅ Passé' },
-      'missed': { color: 'bg-red-100 text-red-700 border-red-300', icon: XCircle, label: '❌ Manqué' },
-      'urgent': { color: 'bg-orange-100 text-orange-700 border-orange-300', icon: AlertTriangle, label: '🔴 Urgent (7j)' },
-      'pending': { color: 'bg-blue-100 text-blue-700 border-blue-300', icon: Clock, label: '🕐 Programmé' }
+      'done': { color: 'bg-emerald-50 text-emerald-600 border-emerald-200/60 shadow-sm shadow-emerald-100/50', icon: CheckCircle, label: 'Passé' },
+      'missed': { color: 'bg-rose-50 text-rose-600 border-rose-200/60 shadow-sm shadow-rose-100/50', icon: XCircle, label: 'Manqué' },
+      'urgent': { color: 'bg-amber-50 text-amber-600 border-amber-200/60 shadow-sm shadow-amber-100/50', icon: AlertTriangle, label: 'Urgent' },
+      'pending': { color: 'bg-sky-50 text-sky-600 border-sky-200/60 shadow-sm shadow-sky-100/50', icon: Clock, label: 'Programmé' }
     }
     
     const c = config[status] || config.pending
+    const Icon = c.icon
     return (
-      <span className={`px-2 py-1 rounded-full text-[9px] font-bold border ${c.color}`}>
+      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-widest border ${c.color}`}>
+        <Icon className="size-3" strokeWidth={2.5} />
         {c.label}
       </span>
     )
@@ -537,10 +539,10 @@ export function ControlsManagement({ path, navigate }) {
   // Statut options
   const statusOptions = [
     { value: 'all', label: 'Tous' },
-    { value: 'pending', label: '🕐 Programmé' },
-    { value: 'urgent', label: '🔴 Urgent' },
-    { value: 'done', label: '✅ Passé' },
-    { value: 'missed', label: '❌ Manqué' }
+    { value: 'pending', label: 'Programmé' },
+    { value: 'urgent', label: 'Urgent' },
+    { value: 'done', label: 'Passé' },
+    { value: 'missed', label: 'Manqué' }
   ]
 
   return (
