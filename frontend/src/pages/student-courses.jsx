@@ -118,7 +118,7 @@ export function StudentCourses({ path, navigate }) {
   const [scores, setScores] = useState({})
   const [savingScore, setSavingScore] = useState(false)
 
-  // Fetch initial data and H5P evaluation scores
+  // Fetch initial data + scores
   useEffect(() => {
     if (!userId) return
 
@@ -177,6 +177,8 @@ export function StudentCourses({ path, navigate }) {
     setClasses(filiere?.classes || [])
   }, [selectedFiliereId, filieres])
 
+
+
   // Save H5P evaluation score
   const saveScore = useCallback(async (courseId, score, maxScore, percentage) => {
     if (scores[courseId]) return
@@ -196,7 +198,6 @@ export function StudentCourses({ path, navigate }) {
         ...prev,
         [courseId]: result,
       }))
-
     } catch (err) {
       if (err.message?.includes("already recorded")) {
         setScores(prev => ({
@@ -280,6 +281,8 @@ export function StudentCourses({ path, navigate }) {
     window.addEventListener("message", handleMessage)
     return () => window.removeEventListener("message", handleMessage)
   }, [activeVideo, scores, saveScore])
+
+
 
   const filteredCourses = courses.filter(course => {
     const matchesSearch = course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -436,6 +439,7 @@ export function StudentCourses({ path, navigate }) {
                         <p className="mt-2 text-xs text-muted-foreground font-medium leading-relaxed line-clamp-2">
                           {course.description || "Consultez cette vidéo de formation en ligne."}
                         </p>
+
 
                       </div>
 
