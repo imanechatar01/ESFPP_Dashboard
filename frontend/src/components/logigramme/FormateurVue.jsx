@@ -7,7 +7,7 @@ import { Legend } from './Legend';
 import { CellContextMenu } from './CellContextMenu';
 import { WeekContextMenu } from './WeekContextMenu';
 import { PrintableFormateurTable } from './PrintableFormateurTable';
-import { Loader2, AlertTriangle, Info } from 'lucide-react';
+import { Loader2, Info } from 'lucide-react';
 
 const calculateUnitMetrics = (unit) => {
   const cells = unit?.cells || [];
@@ -311,37 +311,7 @@ export function FormateurVue({ formateurId }) {
             </p>
           </div>
         </div>
-
-        {conflicts.length > 0 && (
-          <div className="flex items-center gap-3 px-4 py-2 bg-destructive/10 border border-destructive/20 rounded-xl animate-bounce">
-            <AlertTriangle className="size-4 text-destructive" />
-            <p className="text-xs font-black text-destructive uppercase tracking-widest">
-              {conflicts.length} conflit{conflicts.length > 1 ? 's' : ''} d&apos;horaire détecté{conflicts.length > 1 ? 's' : ''}
-            </p>
-          </div>
-        )}
       </div>
-
-      {/* ── Conflicts List ───────────────────────────────────────────────── */}
-      {conflicts.length > 0 && (
-        <div className="p-4 rounded-2xl border border-destructive/20 bg-destructive/5 space-y-3 no-print">
-          <h4 className="text-[10px] font-black uppercase tracking-widest text-destructive/60">Détails des conflits</h4>
-          <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
-            {conflicts.map((conf, idx) => (
-              <div key={idx} className="p-3 rounded-xl bg-white border border-destructive/10 shadow-sm">
-                <p className="text-[10px] font-black text-destructive mb-1">Semaine {conf.semaine} ({conf.week_start_date})</p>
-                <ul className="space-y-1">
-                  {conf.programmes.map((p, pidx) => (
-                    <li key={idx + '-' + pidx} className="text-[9px] font-bold text-muted-foreground leading-tight">
-                      • {p.label}: <span className="text-foreground">{p.unite_nom}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* ── Grids per Logigramme ────────────────────────────────────────── */}
       {Object.values(logigrammeGroups).map((group) => (

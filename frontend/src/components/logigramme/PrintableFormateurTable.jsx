@@ -116,10 +116,8 @@ export function PrintableFormateurTable({ formateurNom, unites, weeks, onContext
           <colgroup>
             {/* Programme column — fixed ~10% */}
             <col style={{ width: '10%' }} />
-            {/* # — fixed ~3% */}
-            <col style={{ width: '3%' }} />
-            {/* Unité de formation — fixed ~15% */}
-            <col style={{ width: '15%' }} />
+            {/* Unité de formation — fixed ~18% (reclaimed 3% from removed N° column) */}
+            <col style={{ width: '18%' }} />
             {/* NOTE: VHG column removed — Point 2 */}
             {/* One col per ACTIVE week — remaining 72% split equally */}
             {activeWeeks.map((w) => (
@@ -130,9 +128,9 @@ export function PrintableFormateurTable({ formateurNom, unites, weeks, onContext
           <thead>
             {/* Row 1: Title + Month spans */}
             <tr>
-              {/* Fixed left columns header cell spanning "Programme / # / Unité" (3 cols, VHG removed) */}
+              {/* Fixed left columns header cell spanning "Programme / Unité" (2 cols, VHG and N° removed) */}
               <th
-                colSpan={3}
+                colSpan={2}
                 style={{
                   backgroundColor: '#FFE600',
                   color: '#000',
@@ -156,9 +154,8 @@ export function PrintableFormateurTable({ formateurNom, unites, weeks, onContext
             {/* Row 2: Sub-column labels + week Monday dates — Point 4 */}
             <tr style={{ backgroundColor: '#f0f4f8' }}>
               <th style={thStyle}>Programme</th>
-              <th style={thStyle}>N°</th>
               <th style={{ ...thStyle, textAlign: 'left' }}>Unité de formation</th>
-              {/* Point 4: Monday date DD/MM in week header */}
+              {/* Point 4: Monday day-only number in week header */}
               {activeWeeks.map((w) => (
                 <th key={w?.semaine || Math.random()} style={{ ...thStyle, fontSize: '5.5pt' }}>
                   {getMondayLabel(w)}
@@ -187,10 +184,6 @@ export function PrintableFormateurTable({ formateurNom, unites, weeks, onContext
                   {/* Programme */}
                   <td style={{ ...tdStyle, fontSize: '5.5pt', fontWeight: 700, color: '#1e3a6e' }}>
                     {programmeName}
-                  </td>
-                  {/* Numéro */}
-                  <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 800 }}>
-                    {idx + 1}
                   </td>
                   {/* Unité name */}
                   <td style={{ ...tdStyle, textAlign: 'left', fontWeight: 700, maxWidth: '138px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}
@@ -341,9 +334,8 @@ function getMondayLabel(week) {
   // Try parsing as a date
   const d = new Date(src);
   if (!isNaN(d.getTime())) {
-    const day   = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    return `${day}/${month}`;
+    const day = String(d.getDate()).padStart(2, '0');
+    return day; // Day-only number to fit wide printable grid
   }
 
   // Fallback: return as-is (e.g. "S36")
