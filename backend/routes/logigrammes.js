@@ -6,16 +6,37 @@ import path from 'path';
 import fs from 'fs';
 import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
+import rateLimit from 'express-rate-limit';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const uploadDir = path.join(__dirname, '../uploads/');
+const uploadDir = path.resolve(path.join(__dirname, '../uploads/'));
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
 const upload = multer({ dest: uploadDir });
+
+/**
+ * Safely delete a file only if it is located inside the allowed uploadDir.
+ * Prevents path-traversal attacks where user-controlled input could resolve
+ * to an arbitrary path outside the uploads folder.
+ * @param {string} filePath - Path to delete (typically req.file.path from multer)
+ */
+function safeUnlink(filePath) {
+  if (!filePath) return;
+  const resolved = path.resolve(filePath);
+  if (!resolved.startsWith(uploadDir + path.sep) && resolved !== uploadDir) {
+    console.error('[security] Blocked attempt to delete file outside uploadDir:', resolved);
+    return;
+  }
+  try {
+    if (fs.existsSync(resolved)) fs.unlinkSync(resolved);
+  } catch (e) {
+    console.error('[cleanup] Failed to delete temp file:', String(resolved), '-', String(e.message));
+  }
+}
 
 const router = express.Router();
 
@@ -601,7 +622,8 @@ router.put('/:id/unites', async (req, res) => {
         .single();
 
       if (error) {
-        console.error(`[logigramme] Error updating unité ${unit.id}:`, error.message);
+        // Pass unit.id as a plain argument — never interpolate user-controlled data as a format string
+        console.error('[logigramme] Error updating unité', String(unit.id), ':', String(error.message));
       } else {
         // --- REDISTRIBUTION AUTOMATIQUE DU VHG ---
         if (unit.vhg !== undefined) {
@@ -643,15 +665,24 @@ router.put('/:id/unites', async (req, res) => {
   }
 });
 
+// Rate limiting specifically for file uploads (import) to prevent DoS
+const importLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // Limit each IP to 20 requests per windowMs
+  message: { error: 'Trop de tentatives d\'importation. Veuillez réessayer dans 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // POST /api/logigramme/import
-router.post('/import', upload.single('file'), async (req, res) => {
+router.post('/import', importLimiter, upload.single('file'), async (req, res) => {
   const { academic_year_id } = req.body;
   const replaceSchedule = req.body.replace_schedule === true || req.body.replace_schedule === 'true';
   const allowMerge = req.body.allow_merge === true || req.body.allow_merge === 'true';
   const file = req.file;
 
   if (!academic_year_id) {
-    if (file) fs.unlinkSync(file.path);
+    if (file) safeUnlink(file.path);
     return res.status(400).json({ error: 'academic_year_id est requis.' });
   }
 
@@ -659,7 +690,7 @@ router.post('/import', upload.single('file'), async (req, res) => {
     return res.status(400).json({ error: 'Aucun fichier téléchargé.' });
   }
   if (replaceSchedule && allowMerge) {
-    if (file) fs.unlinkSync(file.path);
+    if (file) safeUnlink(file.path);
     return res.status(400).json({ error: 'Utilisez soit replace_schedule=true soit allow_merge=true, pas les deux.' });
   }
 
@@ -923,10 +954,8 @@ router.post('/import', upload.single('file'), async (req, res) => {
     console.error('Import error:', err);
     res.status(500).json({ error: err.message });
   } finally {
-    // Always clean up uploaded file
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
+    // Always clean up uploaded file — safeUnlink validates path stays inside uploadDir
+    safeUnlink(filePath);
   }
 });
 
