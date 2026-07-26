@@ -201,36 +201,9 @@ router.get('/:id/unites', async (req, res) => {
       };
     });
 
-    // Conflict Detection (Task E)
-    // A conflict = same formateur has a normal cell with heures > 0 in the same semaine across 2+ logigrammes
-    const conflictsMap = {}; // semaine -> [programmes]
-    
-    processedUnits.forEach(unit => {
-      unit.cells.forEach(cell => {
-        if (cell.cell_type === 'normal' && (parseFloat(cell.heures) || 0) > 0) {
-          if (!conflictsMap[cell.semaine]) {
-            conflictsMap[cell.semaine] = {
-              semaine: cell.semaine,
-              week_start_date: cell.week_start_date,
-              programmes: []
-            };
-          }
-          conflictsMap[cell.semaine].programmes.push({
-            logigramme_id: unit.logigramme_id,
-            label: unit.logigramme 
-              ? `${unit.logigramme.filiere?.name || 'Inconnu'} — ${unit.logigramme.classe?.label || 'Inconnu'}`
-              : 'Programme Inconnu',
-            unite_nom: unit.nom
-          });
-        }
-      });
-    });
-
-    const conflicts = Object.values(conflictsMap).filter(c => c.programmes.length > 1);
-
     res.json({
       unites: processedUnits,
-      conflicts
+      conflicts: []
     });
   } catch (err) {
     console.error(err);

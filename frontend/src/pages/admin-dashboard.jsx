@@ -1,4 +1,5 @@
-// frontend/src/pages/admin-dashboard.jsx
+import { useState, useEffect } from "react"
+import { apiRequest } from "@/lib/api"
 import { 
   Activity, 
   CalendarCheck, 
@@ -9,44 +10,90 @@ import {
   ArrowUpRight, 
   CalendarDays, 
   FileSpreadsheet,
-  LayoutGrid,
   BookOpen,
-  TrendingUp,
-  Clock,
-  AlertCircle
+  Loader2
 } from "lucide-react"
 import { DashboardShell } from "@/components/layout/dashboard-shell"
 import { cn } from "@/lib/utils"
 
 const navItems = [
   { label: "Tableau de bord", path: "/admin/dashboard", icon: Activity },
-   { label: "Gestion des comptes", path: "/admin/accounts", icon: Users },
+  { label: "Gestion des comptes", path: "/admin/accounts", icon: Users },
   { label: "Logigrammes", path: "/admin/logigrammes", icon: CalendarDays },
   { label: "Gestion des contrôles", path: "/admin/controls", icon: FileSpreadsheet },
-   { label: "Filières", path: "/admin/filieres", icon: GraduationCap },
+  { label: "Filières", path: "/admin/filieres", icon: GraduationCap },
   { label: "Cours & Vidéos", path: "/admin/courses", icon: BookOpen },
   { label: "Formateurs", path: "/admin/formateurs", icon: UserPlus },
   { label: "Années", path: "/admin/academic-years", icon: CalendarDays },
 ]
 
-const stats = [
-  { label: "Comptes actifs", value: "128", helper: "Admins et étudiants", icon: Users, color: "text-primary", bg: "bg-primary/10" },
-  { label: "Invitations", value: "12", helper: "En attente d'activation", icon: UserPlus, color: "text-accent", bg: "bg-accent/10" },
-  { label: "Stages planifiés", value: "34", helper: "Session en cours", icon: CalendarCheck, color: "text-secondary-foreground", bg: "bg-secondary" },
-  { label: "Taux de complétion", value: "86%", helper: "+2% depuis hier", icon: ClipboardCheck, color: "text-primary", bg: "bg-primary/10" },
-]
-
 export function AdminDashboard({ path, navigate }) {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    async function loadDashboard() {
+      try {
+        const result = await apiRequest("/api/dashboard/stats")
+        setData(result)
+      } catch (err) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadDashboard()
+  }, [])
+
+  if (loading) {
+    return (
+      <DashboardShell title="Tableau de bord" navItems={navItems} activePath={path} navigate={navigate}>
+        <div className="flex items-center justify-center h-[50vh]">
+          <Loader2 className="size-8 animate-spin text-primary" />
+        </div>
+      </DashboardShell>
+    )
+  }
+
+  if (error) {
+    return (
+      <DashboardShell title="Tableau de bord" navItems={navItems} activePath={path} navigate={navigate}>
+        <div className="p-4 rounded-xl bg-rose-50 text-rose-600 font-bold text-sm">
+          Erreur de chargement: {error}
+        </div>
+      </DashboardShell>
+    )
+  }
+
+  const { stats, recentActivity } = data
+
+  const statCards = [
+    { label: "Comptes actifs", value: stats.activeAccounts, helper: "Admins et étudiants", icon: Users, color: "text-primary", bg: "bg-primary/10" },
+    { label: "Invitations", value: stats.pendingInvitations, helper: "En attente d'activation", icon: UserPlus, color: "text-accent", bg: "bg-accent/10" },
+    { label: "Contrôles", value: stats.pendingControles, helper: "Programmé(s)", icon: CalendarCheck, color: "text-secondary-foreground", bg: "bg-secondary" },
+    { label: "Cours en ligne", value: stats.totalCourses, helper: "Disponibles", icon: BookOpen, color: "text-primary", bg: "bg-primary/10" },
+  ]
+
+  // Helper to format dates
+  const formatTime = (dateStr) => {
+    const d = new Date(dateStr)
+    const today = new Date()
+    if (d.toDateString() === today.toDateString()) {
+      return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+    }
+    return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
+  }
+
   return (
     <DashboardShell
       title="Tableau de bord"
       subtitle="Bienvenue sur votre espace de pilotage ESFPP."
-      
       activePath={path}
       navigate={navigate}
     >
       <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
-        {stats.map((stat) => (
+        {statCards.map((stat) => (
           <section key={stat.label} className="group relative overflow-hidden rounded-2xl border border-border bg-card p-6 transition-all hover:shadow-xl hover:shadow-primary/5 hover:-translate-y-1">
             <div className="flex items-center justify-between">
               <div className={cn("flex size-12 items-center justify-center rounded-xl transition-colors", stat.bg)}>
@@ -74,14 +121,13 @@ export function AdminDashboard({ path, navigate }) {
               </div>
               <h2 className="text-lg font-bold tracking-tight">Suivi académique</h2>
             </div>
-            <button className="text-xs font-bold text-primary hover:underline uppercase tracking-widest">Voir tout</button>
           </div>
           
           <div className="grid gap-4 sm:grid-cols-3">
             {[
-              { title: "Inscriptions", count: "45 nouvelles", desc: "Cette semaine" },
-              { title: "Évaluations", count: "12 en cours", desc: "Modules cliniques" },
-              { title: "Documents", count: "8 à valider", desc: "Stages S2" }
+              { title: "Filières", count: stats.totalFilieres, desc: "Total des filières" },
+              { title: "Évaluations", count: stats.totalControles, desc: "Total des contrôles" },
+              { title: "Étudiants", count: stats.totalStudents, desc: "Inscrits" }
             ].map((item) => (
               <div key={item.title} className="group cursor-pointer rounded-xl border border-border bg-background/50 p-5 transition-all hover:border-primary/50 hover:bg-primary/[0.02]">
                 <p className="text-sm font-bold text-foreground">{item.title}</p>
@@ -107,30 +153,29 @@ export function AdminDashboard({ path, navigate }) {
           </div>
           
           <div className="space-y-4">
-            {[
-              { event: "Invitation envoyée", user: "m.amrani@esfpp.ma", time: "14:20", icon: UserPlus, color: "text-accent" },
-              { event: "Profil complété", user: "s.benali@student.ma", time: "11:05", icon: ClipboardCheck, color: "text-primary" },
-              { event: "Accès admin vérifié", user: "Admin Système", time: "Hier", icon: Activity, color: "text-muted-foreground" },
-              { event: "Nouveau stage créé", user: "Dr. Hassan", time: "Hier", icon: CalendarCheck, color: "text-secondary-foreground" }
-            ].map((item, i) => (
-              <div key={i} className="flex items-start gap-3 p-3 rounded-xl transition-colors hover:bg-muted/50">
-                <div className={cn("mt-1 p-1.5 rounded-md bg-muted", item.color)}>
-                  <item.icon className="size-3.5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-bold truncate">{item.event}</p>
-                    <span className="text-[10px] font-bold text-muted-foreground/60 uppercase">{item.time}</span>
+            {recentActivity.length > 0 ? recentActivity.map((item, i) => {
+              const icon = item.type === 'controle' ? CalendarCheck : (item.type === 'invitation' ? UserPlus : ClipboardCheck);
+              const color = item.type === 'controle' ? "text-secondary-foreground" : (item.type === 'invitation' ? "text-accent" : "text-primary");
+              const IconComp = icon;
+
+              return (
+                <div key={`${item.type}-${item.id}-${i}`} className="flex items-start gap-3 p-3 rounded-xl transition-colors hover:bg-muted/50">
+                  <div className={cn("mt-1 p-1.5 rounded-md bg-muted", color)}>
+                    <IconComp className="size-3.5" />
                   </div>
-                  <p className="text-xs text-muted-foreground truncate">{item.user}</p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-bold truncate">{item.title}</p>
+                      <span className="text-[10px] font-bold text-muted-foreground/60 uppercase">{formatTime(item.created_at)}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate">{item.subtitle}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            }) : (
+              <p className="text-sm text-muted-foreground py-4 text-center">Aucune activité récente</p>
+            )}
           </div>
-          
-          <button className="w-full mt-6 py-3 rounded-xl border border-border text-xs font-bold uppercase tracking-widest text-muted-foreground hover:bg-muted transition-colors">
-            Consulter les logs
-          </button>
         </section>
       </div>
     </DashboardShell>
