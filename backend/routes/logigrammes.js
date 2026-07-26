@@ -63,7 +63,7 @@ function calculateUnitMetrics(unit) {
 
 // GET /api/logigramme/kpis
 router.get('/kpis', async (req, res) => {
-  let { year_id, filiere_id, formateur_id } = req.query;
+  let { year_id, filiere_id, formateur_id, classe_id, niveau_id } = req.query;
 
   try {
     if (!year_id) {
@@ -72,14 +72,22 @@ router.get('/kpis', async (req, res) => {
     }
 
     // 1. Get Logigramme IDs
-    let logQuery = supabaseAdmin.from('logigrammes').select('id');
+    let logQuery = supabaseAdmin
+      .from('logigrammes')
+      .select('id, filiere:filieres(niveau)');
     if (year_id) logQuery = logQuery.eq('academic_year_id', year_id);
     if (filiere_id) logQuery = logQuery.eq('filiere_id', filiere_id);
+    if (classe_id) logQuery = logQuery.eq('classe_id', classe_id);
 
     const { data: logs, error: logsError } = await logQuery;
     if (logsError) throw logsError;
 
-    const logIds = logs.map(l => l.id);
+    // Filter by niveau if provided (niveau is a property of filiere)
+    const filteredLogs = niveau_id
+      ? logs.filter(l => l.filiere?.niveau === niveau_id)
+      : logs;
+
+    const logIds = filteredLogs.map(l => l.id);
     if (logIds.length === 0) {
       return res.json({
         total_programmes: 0,
