@@ -1,4 +1,4 @@
-import { BookOpenCheck, CalendarDays, ClipboardList, UserRound, GraduationCap, MapPin, Clock, ArrowRight, Video } from "lucide-react"
+import { BookOpenCheck, CalendarDays, ClipboardList, UserRound, GraduationCap, MapPin, Clock, ArrowRight, Video, ClipboardCheck } from "lucide-react"
 import { DashboardShell } from "@/components/layout/dashboard-shell"
 import { useAuth } from "@/contexts/auth-context"
 import { cn } from "@/lib/utils"
@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 const navItems = [
   { label: "Mon espace", path: "/student/dashboard", icon: BookOpenCheck },
   { label: "Cours & Vidéos", path: "/student/courses", icon: Video },
+  { label: "Mes examens", path: "/student/exams", icon: ClipboardCheck },
 ]
 
 export function StudentDashboard({ path, navigate }) {

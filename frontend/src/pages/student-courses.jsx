@@ -1,102 +1,16 @@
-import { useEffect, useState, useCallback } from "react"
-import { Play, Loader2, Video, Search, BookOpen, X, CheckCircle2, Trophy, Lock } from "lucide-react"
+import { useEffect, useState } from "react"
+import { Play, Loader2, Video, Search, BookOpen, X, ClipboardCheck } from "lucide-react"
 import { DashboardShell } from "@/components/layout/dashboard-shell"
 import CourseVideoPlayer from "@/components/ui/CourseVideoPlayer"
 import CourseCardPreview from "@/components/ui/CourseCardPreview"
 import { apiRequest } from "@/lib/api"
 import { useAuth } from "@/contexts/auth-context"
-import { cn } from "@/lib/utils"
 
 const navItems = [
   { label: "Mon espace", path: "/student/dashboard", icon: BookOpen },
   { label: "Cours & Vidéos", path: "/student/courses", icon: Video },
+  { label: "Mes examens", path: "/student/exams", icon: ClipboardCheck },
 ]
-
-/**
- * Checks if a video URL points to an H5P interactive module.
- */
-function isH5PCourse(url) {
-  if (!url) return false
-  const lowerUrl = url.toLowerCase()
-  return (
-    lowerUrl.includes("h5p.com") ||
-    lowerUrl.includes("h5p.org") ||
-    lowerUrl.includes("lumi.education") ||
-    lowerUrl.includes("lumi/")
-  )
-}
-
-/**
- * ScoreCompletedCard — Premium card shown when a student has already
- * completed the H5P evaluation for a course.
- */
-function ScoreCompletedCard({ scoreData, courseTitle }) {
-  const pct = Math.round(scoreData.percentage)
-  const isPerfect = pct === 100
-  const isGood = pct >= 70
-
-  return (
-    <div className="w-full aspect-video rounded-xl bg-gradient-to-br from-emerald-50 via-white to-teal-50 border border-emerald-200/60 flex flex-col items-center justify-center p-8 relative overflow-hidden">
-      {/* Background decoration */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(16,185,129,0.08),transparent_50%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,rgba(20,184,166,0.06),transparent_50%)]" />
-
-      <div className="relative z-10 flex flex-col items-center text-center gap-4">
-        {/* Icon */}
-        <div className={cn(
-          "size-16 rounded-2xl flex items-center justify-center shadow-lg",
-          isPerfect
-            ? "bg-gradient-to-br from-amber-400 to-yellow-500 text-white shadow-amber-200/50"
-            : isGood
-              ? "bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-emerald-200/50"
-              : "bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-blue-200/50"
-        )}>
-          {isPerfect ? (
-            <Trophy className="size-8" />
-          ) : (
-            <CheckCircle2 className="size-8" />
-          )}
-        </div>
-
-        {/* Title */}
-        <div>
-          <h3 className="text-lg font-extrabold text-emerald-800 tracking-tight">
-            Évaluation terminée
-          </h3>
-          <p className="text-xs text-emerald-600/70 font-medium mt-1">
-            {courseTitle}
-          </p>
-        </div>
-
-        {/* Score display */}
-        <div className="flex items-baseline gap-1.5">
-          <span className={cn(
-            "text-4xl font-black tabular-nums tracking-tight",
-            isPerfect ? "text-amber-600" : isGood ? "text-emerald-700" : "text-blue-700"
-          )}>
-            {pct}%
-          </span>
-          <span className="text-sm font-bold text-emerald-600/50">
-            ({scoreData.score}/{scoreData.max_score})
-          </span>
-        </div>
-
-        {/* Status label */}
-        <span className={cn(
-          "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest border",
-          isPerfect
-            ? "bg-amber-50 text-amber-700 border-amber-200"
-            : isGood
-              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-              : "bg-blue-50 text-blue-700 border-blue-200"
-        )}>
-          <Lock className="size-3" />
-          {isPerfect ? "Score parfait" : isGood ? "Réussi" : "Complété"}
-        </span>
-      </div>
-    </div>
-  )
-}
 
 export function StudentCourses({ path, navigate }) {
   const { user } = useAuth()
@@ -114,11 +28,7 @@ export function StudentCourses({ path, navigate }) {
   const [activeVideo, setActiveVideo] = useState(null)
   const [error, setError] = useState("")
 
-  // Scores map: { [course_id]: { score, max_score, percentage } }
-  const [scores, setScores] = useState({})
-  const [savingScore, setSavingScore] = useState(false)
-
-  // Fetch initial data + scores
+  // Fetch initial course data
   useEffect(() => {
     if (!userId) return
 
@@ -128,22 +38,14 @@ export function StudentCourses({ path, navigate }) {
       setLoading(true)
       setError("")
       try {
-        const [coursesData, filieresData, scoresData] = await Promise.all([
+        const [coursesData, filieresData] = await Promise.all([
           apiRequest("/api/courses"),
           apiRequest("/api/filieres"),
-          apiRequest("/api/courses/scores"),
         ])
         if (cancelled) return
 
         setCourses(coursesData)
         setFilieres(filieresData)
-
-        // Build scores map
-        const scoresMap = {}
-        for (const s of scoresData) {
-          scoresMap[s.course_id] = s
-        }
-        setScores(scoresMap)
 
         // Try to autofilter based on student's metadata if available
         if (userFiliereId) {
@@ -179,111 +81,6 @@ export function StudentCourses({ path, navigate }) {
 
 
 
-  // Save H5P evaluation score
-  const saveScore = useCallback(async (courseId, score, maxScore, percentage) => {
-    if (scores[courseId]) return
-
-    setSavingScore(true)
-    try {
-      const result = await apiRequest(`/api/courses/${courseId}/score`, {
-        method: "POST",
-        body: JSON.stringify({
-          score: Number(score),
-          max_score: Number(maxScore),
-          percentage: Number(percentage),
-        }),
-      })
-
-      setScores(prev => ({
-        ...prev,
-        [courseId]: result,
-      }))
-    } catch (err) {
-      if (err.message?.includes("already recorded")) {
-        setScores(prev => ({
-          ...prev,
-          [courseId]: { score, max_score: maxScore, percentage },
-        }))
-      } else {
-        console.error("Failed to save score:", err.message)
-      }
-    } finally {
-      setSavingScore(false)
-    }
-  }, [scores])
-
-  // xAPI message listener for H5P score capture
-  useEffect(() => {
-    if (!activeVideo) return
-    if (!isH5PCourse(activeVideo.video_url)) return
-    if (scores[activeVideo.id]) return
-
-    const courseId = activeVideo.id
-
-    function handleMessage(event) {
-      try {
-        let data = event.data
-
-        if (data?.type !== "esfpp-h5p-xapi") return
-
-        if (typeof data === "string") {
-          try {
-            data = JSON.parse(data)
-          } catch {
-            return
-          }
-        }
-
-        const statement =
-          data?.statement ||
-          data?.xAPI ||
-          data?.event?.statement ||
-          data
-
-        if (!statement) return
-
-        const verbId = statement.verb?.id || ""
-        const verbDisplay = statement.verb?.display?.["en-US"] || ""
-        const isSubContent = statement.object?.id?.includes("subContentId")
-
-        const isCompletion =
-          verbId.includes("completed") ||
-          verbId.includes("passed") ||
-          verbDisplay.toLowerCase() === "completed" ||
-          verbDisplay.toLowerCase() === "passed"
-
-        if (!isCompletion || isSubContent) return
-
-        const scoreObj = statement.result?.score
-        if (!scoreObj) return
-
-        const raw = scoreObj.raw != null ? Number(scoreObj.raw) : null
-        const max = scoreObj.max != null ? Number(scoreObj.max) : null
-
-        let pct = 0
-        if (raw != null && max != null && max > 0) {
-          pct = Math.round((raw / max) * 100)
-        } else if (scoreObj.scaled != null) {
-          pct = Math.round(Number(scoreObj.scaled) * 100)
-        } else {
-          return
-        }
-
-        const finalRaw = raw ?? Math.round((pct * 10) / 100)
-        const finalMax = max ?? 10
-
-        saveScore(courseId, finalRaw, finalMax, pct)
-      } catch (err) {
-        console.error("Error parsing H5P message:", err)
-      }
-    }
-
-    window.addEventListener("message", handleMessage)
-    return () => window.removeEventListener("message", handleMessage)
-  }, [activeVideo, scores, saveScore])
-
-
-
   const filteredCourses = courses.filter(course => {
     const matchesSearch = course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (course.description && course.description.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -293,9 +90,6 @@ export function StudentCourses({ path, navigate }) {
 
     return matchesSearch && matchesFiliere && matchesClasse
   })
-
-  const activeVideoScore = activeVideo ? scores[activeVideo.id] : null
-  const activeVideoIsH5P = activeVideo ? isH5PCourse(activeVideo.video_url) : false
 
   return (
     <DashboardShell
@@ -373,19 +167,10 @@ export function StudentCourses({ path, navigate }) {
           <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar min-h-0 pb-6">
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {filteredCourses.map((course) => {
-                const courseScore = scores[course.id]
-                const courseIsH5P = isH5PCourse(course.video_url)
-                const isCompleted = courseIsH5P && courseScore
-
                 return (
                   <div
                     key={course.id}
-                    className={cn(
-                      "group cursor-pointer rounded-2xl border bg-card hover:shadow-xl hover:-translate-y-1 transition-all flex flex-col justify-between overflow-hidden",
-                      isCompleted
-                        ? "border-emerald-200/60 hover:bg-card/85"
-                        : "border-border hover:bg-card/85"
-                    )}
+                    className="group cursor-pointer rounded-2xl border border-border bg-card hover:bg-card/85 hover:shadow-xl hover:-translate-y-1 transition-all flex flex-col justify-between overflow-hidden"
                     onClick={() => setActiveVideo(course)}
                   >
                     {/* Card visual header */}
@@ -394,22 +179,9 @@ export function StudentCourses({ path, navigate }) {
 
                       <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/10 to-transparent" />
 
-                      {isCompleted ? (
-                        <div className="absolute inset-0 bg-emerald-950/40 flex items-center justify-center z-10">
-                          <div className="flex flex-col items-center gap-2">
-                            <div className="size-12 rounded-full bg-emerald-500 text-white shadow-lg flex items-center justify-center">
-                              <CheckCircle2 className="size-6" />
-                            </div>
-                            <span className="text-white text-sm font-black tracking-wide drop-shadow-lg">
-                              {Math.round(courseScore.percentage)}%
-                            </span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="size-12 rounded-full bg-primary/95 text-primary-foreground shadow-lg flex items-center justify-center group-hover:scale-110 group-hover:bg-accent transition-all duration-300 z-10">
-                          <Play className="size-5 fill-current ml-0.5" />
-                        </div>
-                      )}
+                      <div className="size-12 rounded-full bg-primary/95 text-primary-foreground shadow-lg flex items-center justify-center group-hover:scale-110 group-hover:bg-accent transition-all duration-300 z-10">
+                        <Play className="size-5 fill-current ml-0.5" />
+                      </div>
 
                       {/* Badges on video card thumbnail */}
                       <div className="absolute top-3 left-3 flex flex-wrap gap-1 z-10">
@@ -419,12 +191,6 @@ export function StudentCourses({ path, navigate }) {
                         {course.classe && (
                           <span className="inline-flex items-center rounded-lg bg-primary/80 backdrop-blur-md text-white px-2 py-0.5 text-[9px] font-black uppercase tracking-wider border border-white/10">
                             {course.classe.label}
-                          </span>
-                        )}
-                        {isCompleted && (
-                          <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/90 backdrop-blur-md text-white px-2 py-0.5 text-[9px] font-black uppercase tracking-wider border border-white/10">
-                            <CheckCircle2 className="size-2.5" />
-                            Terminé
                           </span>
                         )}
                       </div>
@@ -445,14 +211,7 @@ export function StudentCourses({ path, navigate }) {
 
                       <div className="mt-4 pt-4 border-t border-border/40 flex items-center justify-between text-[10px] text-muted-foreground/60 font-bold uppercase tracking-wider">
                         <span>Formation ESFPP</span>
-                        {isCompleted ? (
-                          <span className="text-emerald-600 flex items-center gap-1">
-                            <CheckCircle2 className="size-3" />
-                            {Math.round(courseScore.percentage)}% — Terminé
-                          </span>
-                        ) : (
-                          <span>{new Date(course.created_at).toLocaleDateString()}</span>
-                        )}
+                        <span>{new Date(course.created_at).toLocaleDateString()}</span>
                       </div>
                     </div>
                   </div>
@@ -477,12 +236,6 @@ export function StudentCourses({ path, navigate }) {
                 <h3 className="font-bold text-base text-foreground mt-0.5">{activeVideo.title}</h3>
               </div>
               <div className="flex items-center gap-2">
-                {savingScore && (
-                  <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1 animate-pulse">
-                    <Loader2 className="size-3 animate-spin" />
-                    Enregistrement score...
-                  </span>
-                )}
                 <button
                   onClick={() => setActiveVideo(null)}
                   className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-all"
@@ -493,17 +246,7 @@ export function StudentCourses({ path, navigate }) {
               </div>
             </div>
 
-            {/* Conditional: Score card OR Video Player */}
-            {activeVideoIsH5P && activeVideoScore ? (
-              <ScoreCompletedCard
-                scoreData={activeVideoScore}
-                courseTitle={activeVideo.title}
-              />
-            ) : (
-              <CourseVideoPlayer
-                videoUrl={activeVideo.video_url}
-              />
-            )}
+            <CourseVideoPlayer videoUrl={activeVideo.video_url} />
 
             {/* Modal Info Footer */}
             {activeVideo.description && (

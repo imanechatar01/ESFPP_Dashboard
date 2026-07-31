@@ -13,6 +13,7 @@ import formateursRouter from "./routes/formateurs.js"
 import yearsRouter from "./routes/academic-years.js"
 import coursesRouter from "./routes/courses.js"
 import dashboardRouter from "./routes/dashboard.js"
+import examsRouter from "./routes/exams.js"
 
 dotenv.config()
 
@@ -58,6 +59,7 @@ app.use('/api/controles', controlsRoutes);
 app.use("/api/formateurs", requireAuth, requireRole("admin"), formateursRouter);
 app.use("/api/years", requireAuth, requireRole("admin"), yearsRouter);
 app.use("/api/courses", requireAuth, coursesRouter);
+app.use("/api/exams", requireServiceRole, requireAuth, examsRouter);
 
 // ---------------------------------------------------------------------------
 // Student — Read-only Logigramme
