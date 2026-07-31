@@ -20,7 +20,8 @@ import {
   X,
   ChevronDown,
   FileSpreadsheet,
-  ClipboardCheck
+  ClipboardCheck,
+  Award
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -63,6 +64,7 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
       { label: "Logigrammes", path: "/admin/logigrammes", icon: CalendarDays },
       { label: "Gestion des contrôles", path: "/admin/controls", icon: FileSpreadsheet },
       { label: "Examens en ligne", path: "/admin/exams", icon: ClipboardCheck },
+      { label: "Notes des étudiants", path: "/admin/exam-results", icon: Award },
       { label: "Filières", path: "/admin/filieres", icon: BookOpen },
       { label: "Cours & Vidéos", path: "/admin/courses", icon: BookOpen },
       { label: "Formateurs", path: "/admin/formateurs", icon: GraduationCap },
@@ -87,7 +89,8 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
           { label: "Tableau de bord", path: "/admin/dashboard", icon: LayoutDashboard },
           { label: "Comptes", path: "/admin/accounts", icon: Users },
           { label: "Gestion des contrôles", path: "/admin/controls", icon: FileSpreadsheet },
-          { label: "Examens en ligne", path: "/admin/exams", icon: ClipboardCheck }
+          { label: "Examens en ligne", path: "/admin/exams", icon: ClipboardCheck },
+          { label: "Notes des étudiants", path: "/admin/exam-results", icon: Award },
         ],
       },
       {

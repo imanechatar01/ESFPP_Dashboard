@@ -326,6 +326,7 @@ function AvailableExams({ exams, completedExamIds, onStart, navigate }) {
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           {exams.map((exam) => {
             const completed = completedExamIds.includes(exam.id)
+            const canRetry = Boolean(exam.canRetry)
             return (
               <article
                 key={exam.id}
@@ -344,7 +345,7 @@ function AvailableExams({ exams, completedExamIds, onStart, navigate }) {
                         ? "bg-accent/10 text-accent"
                         : "bg-primary/10 text-primary"
                     }`}>
-                      {completed ? "Déjà passé" : "Disponible"}
+                      {canRetry ? "2ᵉ tentative" : completed ? "Déjà passé" : "Disponible"}
                     </span>
                   </div>
 
@@ -378,6 +379,17 @@ function AvailableExams({ exams, completedExamIds, onStart, navigate }) {
                     </div>
                   </div>
 
+                  {exam.result && (
+                    <div className={`mt-4 flex items-center justify-between rounded-xl px-3 py-2.5 text-xs font-bold ${
+                      exam.result.passed
+                        ? "bg-accent/10 text-accent"
+                        : "bg-destructive/10 text-destructive"
+                    }`}>
+                      <span>{exam.result.passed ? "Validé" : "Non validé"}</span>
+                      <span>{Math.round(Number(exam.result.percentage || 0))}%</span>
+                    </div>
+                  )}
+
                   <button
                     type="button"
                     disabled={completed}
@@ -389,7 +401,7 @@ function AvailableExams({ exams, completedExamIds, onStart, navigate }) {
                     }`}
                   >
                     {completed ? <CheckCircle2 className="size-4" /> : <Play className="size-4 fill-current" />}
-                    {completed ? "Examen terminé" : "Commencer l'examen"}
+                    {completed ? "Examen terminé" : canRetry ? "Passer la 2ᵉ tentative" : "Commencer l'examen"}
                   </button>
                 </div>
               </article>
@@ -406,37 +418,74 @@ function AvailableExams({ exams, completedExamIds, onStart, navigate }) {
   )
 }
 
-function CompletionScreen({ exam, answeredCount, onBackToExams, navigate }) {
+function CompletionScreen({ exam, answeredCount, result, onBackToExams, onRetry, navigate }) {
+  const percentage = Number(result?.percentage || 0)
+  const passed = Boolean(result?.passed)
+  const passingPercentage = Number(result?.passingPercentage || 60)
+  const canRetry = !passed && Number(result?.attemptNumber || 1) < 2
+
   return (
     <StudentExamShell navigate={navigate}>
       <div className="flex min-h-[calc(100vh-8rem)] items-center justify-center bg-background px-4 py-10 font-sans">
-        <section className="w-full max-w-xl rounded-2xl border border-border bg-card p-7 text-center shadow-lg shadow-primary/5 sm:p-10">
-        <div className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-accent/10 text-accent">
-          <CheckCircle2 className="size-8" />
-        </div>
-        <p className="mt-6 text-xs font-bold uppercase tracking-[0.18em] text-accent">Terminé</p>
-        <h1 className="mt-2 text-xl font-bold text-foreground sm:text-2xl">Examen envoyé avec succès</h1>
-        <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-          Vos {answeredCount} réponse{answeredCount !== 1 ? "s" : ""} à l'examen « {exam.title} »
-          ont bien été enregistrées. Vous pouvez maintenant retourner à votre espace étudiant.
-        </p>
-        <div className="mt-7 flex flex-col justify-center gap-2 sm:flex-row">
-          <button
-            type="button"
-            onClick={onBackToExams}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-sm font-bold text-primary-foreground transition hover:bg-primary/90 focus:outline-none focus:ring-4 focus:ring-primary/20"
-          >
-            Voir les autres examens
-            <ArrowRight className="size-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate("/student/dashboard")}
-            className="inline-flex h-11 items-center justify-center rounded-xl border border-border bg-card px-5 text-sm font-semibold text-muted-foreground transition hover:bg-muted"
-          >
-            Retour à mon espace
-          </button>
-        </div>
+        <section className={`w-full max-w-xl rounded-2xl border bg-card p-7 text-center shadow-lg sm:p-10 ${
+          passed ? "border-accent/30 shadow-accent/5" : "border-destructive/30 shadow-destructive/5"
+        }`}>
+          <div className={`mx-auto flex size-16 items-center justify-center rounded-2xl ${
+            passed ? "bg-accent/10 text-accent" : "bg-destructive/10 text-destructive"
+          }`}>
+            {passed ? <CheckCircle2 className="size-8" /> : <FileCheck2 className="size-8" />}
+          </div>
+          <p className={`mt-6 text-xs font-bold uppercase tracking-[0.18em] ${
+            passed ? "text-accent" : "text-destructive"
+          }`}>
+            {passed ? "Examen validé" : "Examen non validé"}
+          </p>
+          <h1 className="mt-2 text-xl font-bold text-foreground sm:text-2xl">Votre résultat</h1>
+
+          <div className="mx-auto mt-6 grid max-w-sm grid-cols-2 divide-x divide-border rounded-2xl bg-muted/50 py-5">
+            <div className="px-4">
+              <p className={`text-4xl font-black tabular-nums ${passed ? "text-accent" : "text-destructive"}`}>
+                {Math.round(percentage)}%
+              </p>
+              <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Note obtenue</p>
+            </div>
+            <div className="px-4">
+              <p className="text-2xl font-black text-foreground">
+                {result?.score ?? 0}/{result?.totalQuestions ?? exam.questions?.length ?? 0}
+              </p>
+              <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Bonnes réponses</p>
+            </div>
+          </div>
+
+          <p className="mt-5 text-sm leading-relaxed text-muted-foreground">
+            {answeredCount} réponse{answeredCount !== 1 ? "s" : ""} enregistrée{answeredCount !== 1 ? "s" : ""} pour « {exam.title} ».
+            Le seuil de validation est fixé à {passingPercentage}%.
+          </p>
+          {!passed && (
+            <p className="mt-3 rounded-xl bg-destructive/5 px-4 py-3 text-xs font-semibold leading-relaxed text-destructive">
+              {canRetry
+                ? "Vous pouvez repasser cet examen une deuxième et dernière fois."
+                : "Vos deux tentatives ont été utilisées. Cette note est votre résultat final."}
+            </p>
+          )}
+
+          <div className="mt-7 flex flex-col justify-center gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={canRetry ? onRetry : onBackToExams}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-sm font-bold text-primary-foreground transition hover:bg-primary/90 focus:outline-none focus:ring-4 focus:ring-primary/20"
+            >
+              {canRetry ? "Passer la 2ᵉ tentative" : "Voir les autres examens"}
+              <ArrowRight className="size-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/student/dashboard")}
+              className="inline-flex h-11 items-center justify-center rounded-xl border border-border bg-card px-5 text-sm font-semibold text-muted-foreground transition hover:bg-muted"
+            >
+              Retour à mon espace
+            </button>
+          </div>
         </section>
       </div>
     </StudentExamShell>
@@ -452,6 +501,8 @@ export function StudentExam({ navigate }) {
   const [answers, setAnswers] = useState({})
   const [timeLeft, setTimeLeft] = useState(null)
   const [submitted, setSubmitted] = useState(false)
+  const [submissionResult, setSubmissionResult] = useState(null)
+  const [attemptNumber, setAttemptNumber] = useState(1)
   const [sharedBackend, setSharedBackend] = useState(false)
   const [completedExamIds, setCompletedExamIds] = useState(() => {
     try {
@@ -477,29 +528,46 @@ export function StudentExam({ navigate }) {
   const isUnlocked = Boolean(exam && !exam.locked && exam.questions?.length)
 
   const submitExam = useCallback(async () => {
+    let result
+
     if (sharedBackend && activeExamId) {
       try {
-        await apiRequest(`/api/exams/${activeExamId}/submit`, {
+        result = await apiRequest(`/api/exams/${activeExamId}/submit`, {
           method: "POST",
           body: JSON.stringify({ answers }),
         })
       } catch (error) {
-        if (!String(error.message).toLowerCase().includes("déjà")) {
-          await Swal.fire({
-            icon: "error",
-            iconColor: "var(--destructive)",
-            background: "var(--card)",
-            color: "var(--foreground)",
-            title: "Envoi impossible",
-            text: error.message || "Vos réponses n'ont pas pu être envoyées.",
-            confirmButtonText: "Réessayer",
-            confirmButtonColor: "var(--primary)",
-          })
-          return false
-        }
+        await Swal.fire({
+          icon: "error",
+          iconColor: "var(--destructive)",
+          background: "var(--card)",
+          color: "var(--foreground)",
+          title: "Envoi impossible",
+          text: error.message || "Vos réponses n'ont pas pu être envoyées.",
+          confirmButtonText: "Réessayer",
+          confirmButtonColor: "var(--primary)",
+        })
+        return false
+      }
+    } else {
+      const localQuestions = exam?.questions || []
+      const score = localQuestions.reduce(
+        (total, question) =>
+          Number(answers[question.id]) === Number(question.correctAnswer) ? total + 1 : total,
+        0,
+      )
+      const percentage = localQuestions.length ? (score * 100) / localQuestions.length : 0
+      result = {
+        score,
+        totalQuestions: localQuestions.length,
+        percentage,
+        passed: percentage >= 60,
+        attemptNumber,
+        passingPercentage: 60,
       }
     }
 
+    setSubmissionResult(result)
     setSubmitted(true)
     if (activeExamId) {
       setCompletedExamIds((current) =>
@@ -507,7 +575,7 @@ export function StudentExam({ navigate }) {
       )
     }
     return true
-  }, [activeExamId, answers, sharedBackend])
+  }, [activeExamId, answers, attemptNumber, exam, sharedBackend])
 
   useEffect(() => {
     let active = true
@@ -545,11 +613,13 @@ export function StudentExam({ navigate }) {
     )
   }, [completedExamIds, completionStorageKey])
 
-  const startExam = (selectedExam) => {
+  const startExam = (selectedExam, nextAttemptNumber = selectedExam.canRetry ? 2 : 1) => {
     setActiveExamId(selectedExam.id)
     setCurrentIndex(0)
     setAnswers({})
     setSubmitted(false)
+    setSubmissionResult(null)
+    setAttemptNumber(nextAttemptNumber)
     setTimeLeft(Number(selectedExam.duration || 60) * 60)
   }
 
@@ -559,6 +629,8 @@ export function StudentExam({ navigate }) {
     setAnswers({})
     setTimeLeft(null)
     setSubmitted(false)
+    setSubmissionResult(null)
+    setAttemptNumber(1)
   }
 
   useEffect(() => {
@@ -628,7 +700,9 @@ export function StudentExam({ navigate }) {
       <CompletionScreen
         exam={exam || FALLBACK_EXAM}
         answeredCount={answeredCount}
+        result={submissionResult}
         onBackToExams={backToExamList}
+        onRetry={() => startExam(exam || FALLBACK_EXAM, Number(submissionResult?.attemptNumber || 1) + 1)}
         navigate={navigate}
       />
     )

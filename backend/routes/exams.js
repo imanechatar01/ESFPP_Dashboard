@@ -4,6 +4,23 @@ import { supabaseAdmin } from "../lib/supabase.js"
 import { requireRole } from "../lib/auth.js"
 
 const router = express.Router()
+const PASSING_PERCENTAGE = 60
+
+function formatAttempt(row) {
+  const percentage = Number(row.percentage || 0)
+
+  return {
+    id: row.id,
+    examId: row.exam_id,
+    studentId: row.student_id,
+    score: row.score,
+    totalQuestions: row.total_questions,
+    percentage,
+    passed: Boolean(row.passed),
+    attemptNumber: row.attempt_number || 1,
+    submittedAt: row.submitted_at,
+  }
+}
 
 function mapExam(row, includeCorrectAnswers = false) {
   const questions = Array.isArray(row.questions) ? row.questions : []
@@ -105,20 +122,90 @@ router.get("/available", requireRole("student"), async (req, res) => {
           .order("created_at", { ascending: false }),
         supabaseAdmin
           .from("exam_attempts")
-          .select("exam_id, submitted_at")
-          .eq("student_id", req.user.id),
+          .select("id, exam_id, student_id, score, total_questions, percentage, passed, attempt_number, submitted_at")
+          .eq("student_id", req.user.id)
+          .order("attempt_number", { ascending: false }),
       ])
 
     if (examsError) throw examsError
     if (attemptsError) throw attemptsError
 
-    const completedExamIds = new Set((attempts || []).map((attempt) => attempt.exam_id))
+    const latestAttempts = new Map()
+    for (const attempt of attempts || []) {
+      if (!latestAttempts.has(attempt.exam_id)) latestAttempts.set(attempt.exam_id, attempt)
+    }
+
     res.json(
-      (exams || []).map((exam) => ({
-        ...mapExam(exam, false),
-        completed: completedExamIds.has(exam.id),
-      })),
+      (exams || []).map((exam) => {
+        const latestAttempt = latestAttempts.get(exam.id)
+        return {
+          ...mapExam(exam, false),
+          completed: Boolean(latestAttempt && (latestAttempt.passed || latestAttempt.attempt_number >= 2)),
+          canRetry: Boolean(latestAttempt && !latestAttempt.passed && latestAttempt.attempt_number < 2),
+          result: latestAttempt ? formatAttempt(latestAttempt) : null,
+          passingPercentage: PASSING_PERCENTAGE,
+        }
+      }),
     )
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Admin: consult every student's exam results.
+router.get("/results", requireRole("admin"), async (_req, res) => {
+  try {
+    const [{ data: attempts, error: attemptsError }, { data: usersData, error: usersError }] =
+      await Promise.all([
+        supabaseAdmin
+          .from("exam_attempts")
+          .select(`
+            id,
+            exam_id,
+            student_id,
+            score,
+            total_questions,
+            percentage,
+            passed,
+            attempt_number,
+            submitted_at,
+            exam:exams (id, title, exam_date)
+          `)
+          .order("attempt_number", { ascending: false })
+          .order("submitted_at", { ascending: false }),
+        supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
+      ])
+
+    if (attemptsError) throw attemptsError
+    if (usersError) throw usersError
+
+    const usersById = new Map((usersData?.users || []).map((user) => [user.id, user]))
+    const finalAttempts = new Map()
+    for (const attempt of attempts || []) {
+      const key = `${attempt.student_id}-${attempt.exam_id}`
+      if (!finalAttempts.has(key)) finalAttempts.set(key, attempt)
+    }
+
+    const results = [...finalAttempts.values()]
+      .filter((attempt) => attempt.passed || attempt.attempt_number >= 2)
+      .map((attempt) => {
+        const user = usersById.get(attempt.student_id)
+        const metadata = user?.user_metadata || {}
+        const fullName = [metadata.first_name || metadata.prenom, metadata.last_name || metadata.nom]
+          .filter(Boolean)
+          .join(" ")
+
+        return {
+          ...formatAttempt(attempt),
+          studentName: fullName || user?.email?.split("@")[0] || "Étudiant",
+          studentEmail: user?.email || "",
+          examTitle: attempt.exam?.title || "Examen supprimé",
+          examDate: attempt.exam?.exam_date || null,
+          passingPercentage: PASSING_PERCENTAGE,
+        }
+      })
+
+    res.json(results)
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
@@ -206,15 +293,21 @@ router.post("/:id/submit", requireRole("student"), async (req, res) => {
     if (examError || !exam) return res.status(404).json({ error: "Examen introuvable" })
     if (exam.locked) return res.status(423).json({ error: "Cet examen est verrouillé" })
 
-    const { data: existing } = await supabaseAdmin
+    const { data: previousAttempts, error: attemptsError } = await supabaseAdmin
       .from("exam_attempts")
-      .select("id")
+      .select("id, attempt_number, passed")
       .eq("exam_id", exam.id)
       .eq("student_id", req.user.id)
-      .maybeSingle()
+      .order("attempt_number", { ascending: false })
+      .limit(1)
 
-    if (existing) {
-      return res.status(409).json({ error: "Vous avez déjà validé cet examen" })
+    if (attemptsError) throw attemptsError
+    const latestAttempt = previousAttempts?.[0] || null
+    if (latestAttempt?.passed) {
+      return res.status(409).json({ error: "Cet examen est déjà validé" })
+    }
+    if (latestAttempt && latestAttempt.attempt_number >= 2) {
+      return res.status(409).json({ error: "Les deux tentatives autorisées ont déjà été utilisées" })
     }
 
     const answers = req.body.answers && typeof req.body.answers === "object" ? req.body.answers : {}
@@ -224,6 +317,11 @@ router.post("/:id/submit", requireRole("student"), async (req, res) => {
         Number(answers[question.id]) === Number(question.correctAnswer) ? total + 1 : total,
       0,
     )
+    const percentage = questions.length
+      ? Number(((score * 100) / questions.length).toFixed(2))
+      : 0
+    const passed = percentage >= PASSING_PERCENTAGE
+    const attemptNumber = (latestAttempt?.attempt_number || 0) + 1
 
     const { data, error } = await supabaseAdmin
       .from("exam_attempts")
@@ -233,18 +331,21 @@ router.post("/:id/submit", requireRole("student"), async (req, res) => {
         answers,
         score,
         total_questions: questions.length,
+        percentage,
+        passed,
+        attempt_number: attemptNumber,
       })
-      .select("exam_id, score, total_questions, submitted_at")
+      .select("id, exam_id, student_id, score, total_questions, percentage, passed, attempt_number, submitted_at")
       .single()
 
     if (error) {
       if (error.code === "23505") {
-        return res.status(409).json({ error: "Vous avez déjà validé cet examen" })
+        return res.status(409).json({ error: "Cette tentative a déjà été enregistrée" })
       }
       throw error
     }
 
-    res.status(201).json(data)
+    res.status(201).json({ ...formatAttempt(data), passingPercentage: PASSING_PERCENTAGE })
   } catch (error) {
     res.status(500).json({ error: error.message })
   }

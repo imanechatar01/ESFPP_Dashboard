@@ -1,4 +1,4 @@
--- Shared online exams and one immutable attempt per student.
+-- Shared online exams with graded, repeatable attempts.
 CREATE TABLE IF NOT EXISTS public.exams (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   title text NOT NULL,
@@ -18,8 +18,11 @@ CREATE TABLE IF NOT EXISTS public.exam_attempts (
   answers jsonb NOT NULL DEFAULT '{}'::jsonb,
   score integer NOT NULL DEFAULT 0,
   total_questions integer NOT NULL DEFAULT 0,
+  percentage numeric(5,2) NOT NULL DEFAULT 0,
+  passed boolean NOT NULL DEFAULT false,
+  attempt_number integer NOT NULL DEFAULT 1 CHECK (attempt_number > 0),
   submitted_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (exam_id, student_id)
+  UNIQUE (exam_id, student_id, attempt_number)
 );
 
 CREATE INDEX IF NOT EXISTS exams_locked_idx ON public.exams (locked);

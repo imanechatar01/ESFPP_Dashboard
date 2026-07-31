@@ -18,6 +18,7 @@ import { useCallback, useEffect, useState } from "react"
 import { ControlsManagement } from './pages/controls-management' // ✅ AJOUTER CETTE LIGNE
 import { ExamsManagement } from "@/pages/exams-management"
 import { StudentExam } from "@/pages/student-exam"
+import { ExamResults } from "@/pages/exam-results"
 
 function usePath() {
   const [path, setPath] = useState(() => window.location.pathname)
@@ -81,6 +82,7 @@ function AppRoutes() {
           {path === "/admin/courses" && <AdminCourses path={path} navigate={navigate} />}
           {path === "/admin/controls" && <ControlsManagement path={path} navigate={navigate} />} {/* ✅ AJOUTER CETTE LIGNE */}
           {path === "/admin/exams" && <ExamsManagement path={path} navigate={navigate} />}
+          {path === "/admin/exam-results" && <ExamResults path={path} navigate={navigate} />}
         </LogigrammeProvider>
       </RequireRole>
     )
