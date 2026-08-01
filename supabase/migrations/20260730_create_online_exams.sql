@@ -20,9 +20,10 @@ CREATE TABLE IF NOT EXISTS public.exam_attempts (
   total_questions integer NOT NULL DEFAULT 0,
   percentage numeric(5,2) NOT NULL DEFAULT 0,
   passed boolean NOT NULL DEFAULT false,
-  attempt_number integer NOT NULL DEFAULT 1 CHECK (attempt_number > 0),
+  -- Number of attempts already used (maximum 2). The row always keeps the best score.
+  attempt_number integer NOT NULL DEFAULT 1 CHECK (attempt_number BETWEEN 1 AND 2),
   submitted_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (exam_id, student_id, attempt_number)
+  UNIQUE (exam_id, student_id)
 );
 
 CREATE INDEX IF NOT EXISTS exams_locked_idx ON public.exams (locked);

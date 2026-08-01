@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
+import Swal from "sweetalert2"
 import {
   Award,
   CheckCircle2,
@@ -6,6 +7,7 @@ import {
   FileCheck2,
   Loader2,
   Search,
+  Trash2,
   UserRound,
   Users,
   XCircle,
@@ -31,6 +33,7 @@ export function ExamResults({ path, navigate }) {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [expandedStudentId, setExpandedStudentId] = useState(null)
+  const [deletingStudentId, setDeletingStudentId] = useState(null)
 
   useEffect(() => {
     let active = true
@@ -96,6 +99,42 @@ export function ExamResults({ path, navigate }) {
       : 0
     return { studentCount, passed, failed, average }
   }, [results])
+
+  const deleteStudentResults = async (student) => {
+    const confirmation = await Swal.fire({
+      icon: "warning",
+      title: "Supprimer les résultats ?",
+      text: `Toutes les notes d'examen de ${student.name} seront supprimées. Son compte étudiant sera conservé.`,
+      showCancelButton: true,
+      confirmButtonText: "Supprimer les résultats",
+      cancelButtonText: "Annuler",
+      confirmButtonColor: "var(--destructive)",
+    })
+
+    if (!confirmation.isConfirmed) return
+
+    setDeletingStudentId(student.id)
+    try {
+      await apiRequest(`/api/exams/results/students/${student.id}`, { method: "DELETE" })
+      setResults((current) => current.filter((result) => result.studentId !== student.id))
+      setExpandedStudentId(null)
+      await Swal.fire({
+        icon: "success",
+        title: "Résultats supprimés",
+        text: "Le compte étudiant n'a pas été supprimé.",
+        timer: 1800,
+        showConfirmButton: false,
+      })
+    } catch (requestError) {
+      await Swal.fire({
+        icon: "error",
+        title: "Suppression impossible",
+        text: requestError.message || "Les résultats n'ont pas pu être supprimés.",
+      })
+    } finally {
+      setDeletingStudentId(null)
+    }
+  }
 
   return (
     <DashboardShell
@@ -206,6 +245,27 @@ export function ExamResults({ path, navigate }) {
 
                     {expanded && (
                       <div className="border-t border-border bg-muted/20 px-4 py-4 sm:px-6">
+                        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="text-xs font-bold text-foreground">Détail des notes finales</p>
+                            <p className="mt-0.5 text-[10px] text-muted-foreground">
+                              La meilleure note est conservée lorsque deux tentatives ont été utilisées.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={deletingStudentId === student.id}
+                            onClick={() => deleteStudentResults(student)}
+                            className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-destructive/20 bg-destructive/5 px-3 text-[10px] font-bold text-destructive transition hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {deletingStudentId === student.id ? (
+                              <Loader2 className="size-3.5 animate-spin" />
+                            ) : (
+                              <Trash2 className="size-3.5" />
+                            )}
+                            Supprimer ses résultats
+                          </button>
+                        </div>
                         <div className="overflow-x-auto rounded-xl border border-border bg-card">
                           <table className="w-full min-w-[760px] text-left">
                             <thead className="bg-muted/50 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">

@@ -110,7 +110,7 @@ router.get("/", requireRole("admin"), async (_req, res) => {
   }
 })
 
-// Student: only unlocked exams, with answer keys removed.
+// Student: every scheduled exam, with answer keys removed.
 router.get("/available", requireRole("student"), async (req, res) => {
   try {
     const [{ data: exams, error: examsError }, { data: attempts, error: attemptsError }] =
@@ -118,8 +118,7 @@ router.get("/available", requireRole("student"), async (req, res) => {
         supabaseAdmin
           .from("exams")
           .select("*")
-          .eq("locked", false)
-          .order("created_at", { ascending: false }),
+          .order("exam_date", { ascending: true }),
         supabaseAdmin
           .from("exam_attempts")
           .select("id, exam_id, student_id, score, total_questions, percentage, passed, attempt_number, submitted_at")
@@ -211,6 +210,21 @@ router.get("/results", requireRole("admin"), async (_req, res) => {
   }
 })
 
+// Admin: remove a student's exam results without deleting their account.
+router.delete("/results/students/:studentId", requireRole("admin"), async (req, res) => {
+  try {
+    const { error } = await supabaseAdmin
+      .from("exam_attempts")
+      .delete()
+      .eq("student_id", req.params.studentId)
+
+    if (error) throw error
+    res.status(204).send()
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
 router.post("/", requireRole("admin"), async (req, res) => {
   const payload = validateExamPayload(req.body)
   if (payload.error) return res.status(400).json({ error: payload.error })
@@ -293,20 +307,18 @@ router.post("/:id/submit", requireRole("student"), async (req, res) => {
     if (examError || !exam) return res.status(404).json({ error: "Examen introuvable" })
     if (exam.locked) return res.status(423).json({ error: "Cet examen est verrouillé" })
 
-    const { data: previousAttempts, error: attemptsError } = await supabaseAdmin
+    const { data: existingAttempt, error: attemptsError } = await supabaseAdmin
       .from("exam_attempts")
-      .select("id, attempt_number, passed")
+      .select("id, answers, score, total_questions, percentage, passed, attempt_number, submitted_at")
       .eq("exam_id", exam.id)
       .eq("student_id", req.user.id)
-      .order("attempt_number", { ascending: false })
-      .limit(1)
+      .maybeSingle()
 
     if (attemptsError) throw attemptsError
-    const latestAttempt = previousAttempts?.[0] || null
-    if (latestAttempt?.passed) {
+    if (existingAttempt?.passed) {
       return res.status(409).json({ error: "Cet examen est déjà validé" })
     }
-    if (latestAttempt && latestAttempt.attempt_number >= 2) {
+    if (existingAttempt && existingAttempt.attempt_number >= 2) {
       return res.status(409).json({ error: "Les deux tentatives autorisées ont déjà été utilisées" })
     }
 
@@ -321,26 +333,46 @@ router.post("/:id/submit", requireRole("student"), async (req, res) => {
       ? Number(((score * 100) / questions.length).toFixed(2))
       : 0
     const passed = percentage >= PASSING_PERCENTAGE
-    const attemptNumber = (latestAttempt?.attempt_number || 0) + 1
+    const attemptNumber = (existingAttempt?.attempt_number || 0) + 1
+    const submittedAt = new Date().toISOString()
+    const newResultIsBetter = !existingAttempt || percentage > Number(existingAttempt.percentage || 0)
+    const bestResult = newResultIsBetter
+      ? { answers, score, total_questions: questions.length, percentage, passed }
+      : {
+          answers: existingAttempt.answers,
+          score: existingAttempt.score,
+          total_questions: existingAttempt.total_questions,
+          percentage: Number(existingAttempt.percentage || 0),
+          passed: Boolean(existingAttempt.passed),
+        }
 
-    const { data, error } = await supabaseAdmin
-      .from("exam_attempts")
-      .insert({
-        exam_id: exam.id,
-        student_id: req.user.id,
-        answers,
-        score,
-        total_questions: questions.length,
-        percentage,
-        passed,
-        attempt_number: attemptNumber,
-      })
+    const query = existingAttempt
+      ? supabaseAdmin
+          .from("exam_attempts")
+          .update({
+            ...bestResult,
+            attempt_number: attemptNumber,
+            submitted_at: submittedAt,
+          })
+          .eq("id", existingAttempt.id)
+          .eq("attempt_number", existingAttempt.attempt_number)
+      : supabaseAdmin
+          .from("exam_attempts")
+          .insert({
+            exam_id: exam.id,
+            student_id: req.user.id,
+            ...bestResult,
+            attempt_number: attemptNumber,
+            submitted_at: submittedAt,
+          })
+
+    const { data, error } = await query
       .select("id, exam_id, student_id, score, total_questions, percentage, passed, attempt_number, submitted_at")
       .single()
 
     if (error) {
       if (error.code === "23505") {
-        return res.status(409).json({ error: "Cette tentative a déjà été enregistrée" })
+        return res.status(409).json({ error: "Un résultat existe déjà pour cet examen" })
       }
       throw error
     }

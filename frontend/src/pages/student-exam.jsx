@@ -12,8 +12,6 @@ import {
   FileCheck2,
   HeartPulse,
   ListChecks,
-  Loader2,
-  LockKeyhole,
   Play,
   ShieldCheck,
   Video,
@@ -99,7 +97,7 @@ function StudentExamShell({ navigate, children }) {
   )
 }
 
-function WaitingRoom({ exam, navigate }) {
+function WaitingRoom({ navigate }) {
   return (
     <StudentExamShell navigate={navigate}>
       <div className="min-h-[calc(100vh-8rem)] bg-background px-4 py-8 font-sans sm:flex sm:items-center sm:justify-center sm:py-12">
@@ -110,39 +108,24 @@ function WaitingRoom({ exam, navigate }) {
 
         <section className="rounded-2xl border border-border bg-card p-6 text-center shadow-lg shadow-primary/5 sm:p-10">
           <div className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-            <LockKeyhole className="size-7" strokeWidth={1.8} />
+            <CalendarDays className="size-7" strokeWidth={1.8} />
           </div>
 
           <p className="mt-6 text-xs font-bold uppercase tracking-[0.18em] text-primary">
-            Salle d'attente
+            Calendrier des examens
           </p>
           <h1 className="mt-2 text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-            {exam.title || "Examen Final : Introduction"}
+            Aucun examen programmé
           </h1>
 
           <p className="mx-auto mt-5 max-w-xl text-justify text-sm font-normal leading-relaxed text-muted-foreground sm:text-base">
-            Votre examen n'est pas encore accessible. Vous êtes au bon endroit : restez sur cette
-            page, elle s'actualisera automatiquement dès que l'administrateur ouvrira la session.
-            Profitez de ce moment pour vous installer confortablement et vérifier votre connexion.
+            Aucun examen n'est planifié pour le moment. Dès qu'un examen sera créé, sa date et son
+            statut apparaîtront ici afin que vous puissiez vous organiser à l'avance.
           </p>
-
-          <div className="mx-auto mt-6 flex w-fit items-center gap-2 rounded-full bg-muted px-4 py-2 text-xs font-semibold text-muted-foreground">
-            <Loader2 className="size-4 animate-spin text-primary" />
-            En attente du déverrouillage
-          </div>
-
-          <button
-            type="button"
-            disabled
-            className="mt-8 inline-flex h-11 w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-muted px-6 text-sm font-bold text-muted-foreground opacity-80 sm:w-auto sm:min-w-56"
-          >
-            <LockKeyhole className="size-4" />
-            Examen verrouillé
-          </button>
 
           <div className="mt-8 flex items-center justify-center gap-2 border-t border-border pt-5 text-xs text-muted-foreground">
             <ShieldCheck className="size-4 text-accent" />
-            Votre place dans la session est réservée
+            Le calendrier est actualisé automatiquement
           </div>
           </section>
         </div>
@@ -267,6 +250,8 @@ function QuestionCard({ question, index, selectedAnswer, onAnswer }) {
 }
 
 function AvailableExams({ exams, completedExamIds, onStart, navigate }) {
+  const accessibleCount = exams.filter((exam) => !exam.locked).length
+
   return (
     <StudentExamShell navigate={navigate}>
       <div className="bg-background px-4 py-4 font-sans sm:py-6">
@@ -292,15 +277,15 @@ function AvailableExams({ exams, completedExamIds, onStart, navigate }) {
                   <span className="relative inline-flex size-2.5 rounded-full bg-accent" />
                 </span>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary-foreground/75">
-                  Session ouverte
+                  Examens à distance
                 </p>
               </div>
               <h1 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">
-                Examens disponibles
+                Calendrier de vos examens
               </h1>
               <p className="mt-2 max-w-xl text-sm leading-relaxed text-primary-foreground/75">
-                Choisissez l'examen que vous souhaitez passer. Le chronomètre commencera uniquement
-                après avoir cliqué sur « Commencer ».
+                Consultez à l'avance les dates prévues. Les examens ouverts peuvent être commencés
+                immédiatement ; les autres restent visibles comme examens programmés.
               </p>
             </div>
             <div className="flex size-16 shrink-0 items-center justify-center rounded-2xl bg-white/10">
@@ -311,15 +296,15 @@ function AvailableExams({ exams, completedExamIds, onStart, navigate }) {
 
         <div className="mt-6 flex items-end justify-between gap-4">
           <div>
-            <h2 className="text-lg font-bold text-foreground">Choisir un examen</h2>
+            <h2 className="text-lg font-bold text-foreground">Examens programmés</h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              {exams.length} examen{exams.length !== 1 ? "s" : ""} déverrouillé
-              {exams.length !== 1 ? "s" : ""} par l'administrateur
+              {exams.length} examen{exams.length !== 1 ? "s" : ""} dans votre calendrier,
+              dont {accessibleCount} actuellement accessible{accessibleCount !== 1 ? "s" : ""}
             </p>
           </div>
           <div className="flex items-center gap-2 text-xs font-semibold text-accent">
             <ShieldCheck className="size-4" />
-            Accès autorisé
+            Calendrier à jour
           </div>
         </div>
 
@@ -327,31 +312,56 @@ function AvailableExams({ exams, completedExamIds, onStart, navigate }) {
           {exams.map((exam) => {
             const completed = completedExamIds.includes(exam.id)
             const canRetry = Boolean(exam.canRetry)
+            const locked = Boolean(exam.locked)
+            const examDate = exam.date
+              ? new Intl.DateTimeFormat("fr-FR", {
+                  weekday: "long",
+                  day: "2-digit",
+                  month: "long",
+                  year: "numeric",
+                }).format(new Date(`${exam.date}T12:00:00`))
+              : "Date à confirmer"
             return (
               <article
                 key={exam.id}
                 className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"
               >
-                <div className={`h-1 ${completed ? "bg-accent" : "bg-primary"}`} />
+                <div className={`h-1 ${completed ? "bg-accent" : locked ? "bg-muted-foreground/30" : "bg-primary"}`} />
                 <div className="p-5 sm:p-6">
                   <div className="flex items-start justify-between gap-3">
                     <div className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${
-                      completed ? "bg-accent/10 text-accent" : "bg-primary/10 text-primary"
+                      completed
+                        ? "bg-accent/10 text-accent"
+                        : locked
+                          ? "bg-muted text-muted-foreground"
+                          : "bg-primary/10 text-primary"
                     }`}>
-                      {completed ? <CheckCircle2 className="size-5" /> : <FileCheck2 className="size-5" />}
+                      {completed ? <CheckCircle2 className="size-5" /> : locked ? <CalendarDays className="size-5" /> : <FileCheck2 className="size-5" />}
                     </div>
                     <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
                       completed
                         ? "bg-accent/10 text-accent"
-                        : "bg-primary/10 text-primary"
+                        : locked
+                          ? "bg-muted text-muted-foreground"
+                          : "bg-primary/10 text-primary"
                     }`}>
-                      {canRetry ? "2ᵉ tentative" : completed ? "Déjà passé" : "Disponible"}
+                      {canRetry ? "2ᵉ tentative" : completed ? "Déjà passé" : locked ? "Programmé" : "Disponible"}
                     </span>
                   </div>
 
                   <h3 className="mt-4 text-base font-bold leading-snug text-foreground">
                     {exam.title}
                   </h3>
+
+                  <div className={`mt-4 flex items-center gap-3 rounded-xl border px-3.5 py-3 ${
+                    locked ? "border-border bg-muted/40" : "border-primary/15 bg-primary/5"
+                  }`}>
+                    <CalendarDays className={`size-5 shrink-0 ${locked ? "text-muted-foreground" : "text-primary"}`} />
+                    <div>
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Date prévue</p>
+                      <p className="mt-0.5 text-xs font-bold capitalize text-foreground">{examDate}</p>
+                    </div>
+                  </div>
 
                   <div className="mt-5 grid grid-cols-3 divide-x divide-border rounded-xl bg-muted/40 py-3">
                     <div className="px-2 text-center">
@@ -392,16 +402,16 @@ function AvailableExams({ exams, completedExamIds, onStart, navigate }) {
 
                   <button
                     type="button"
-                    disabled={completed}
+                    disabled={completed || locked}
                     onClick={() => onStart(exam)}
                     className={`mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl text-sm font-bold transition focus:outline-none focus:ring-4 ${
-                      completed
+                      completed || locked
                         ? "cursor-not-allowed bg-muted text-muted-foreground"
                         : "bg-primary text-primary-foreground hover:bg-primary/90 focus:ring-primary/20"
                     }`}
                   >
-                    {completed ? <CheckCircle2 className="size-4" /> : <Play className="size-4 fill-current" />}
-                    {completed ? "Examen terminé" : canRetry ? "Passer la 2ᵉ tentative" : "Commencer l'examen"}
+                    {completed ? <CheckCircle2 className="size-4" /> : locked ? <CalendarDays className="size-4" /> : <Play className="size-4 fill-current" />}
+                    {completed ? "Examen terminé" : locked ? "Examen programmé" : canRetry ? "Passer la 2ᵉ tentative" : "Commencer l'examen"}
                   </button>
                 </div>
               </article>
@@ -410,7 +420,7 @@ function AvailableExams({ exams, completedExamIds, onStart, navigate }) {
         </div>
 
         <p className="mt-6 text-center text-[11px] leading-relaxed text-muted-foreground">
-          La liste est actualisée automatiquement selon les autorisations de l'administrateur.
+          Les dates et les statuts sont actualisés automatiquement.
           </p>
         </div>
       </div>
@@ -502,6 +512,7 @@ export function StudentExam({ navigate }) {
   const [timeLeft, setTimeLeft] = useState(null)
   const [submitted, setSubmitted] = useState(false)
   const [submissionResult, setSubmissionResult] = useState(null)
+  const [previousAttemptResult, setPreviousAttemptResult] = useState(null)
   const [attemptNumber, setAttemptNumber] = useState(1)
   const [sharedBackend, setSharedBackend] = useState(false)
   const [completedExamIds, setCompletedExamIds] = useState(() => {
@@ -513,12 +524,8 @@ export function StudentExam({ navigate }) {
     }
   })
 
-  const availableExams = useMemo(
-    () => exams.filter((exam) => !exam.locked && exam.questions?.length),
-    [exams],
-  )
-  const waitingExam = useMemo(
-    () => exams.find((exam) => exam.locked) || exams[0] || FALLBACK_EXAM,
+  const scheduledExams = useMemo(
+    () => exams.filter((exam) => exam.questions?.length),
     [exams],
   )
   const exam = useMemo(
@@ -557,7 +564,7 @@ export function StudentExam({ navigate }) {
         0,
       )
       const percentage = localQuestions.length ? (score * 100) / localQuestions.length : 0
-      result = {
+      const currentResult = {
         score,
         totalQuestions: localQuestions.length,
         percentage,
@@ -565,17 +572,30 @@ export function StudentExam({ navigate }) {
         attemptNumber,
         passingPercentage: 60,
       }
+      result = previousAttemptResult && Number(previousAttemptResult.percentage) > percentage
+        ? { ...previousAttemptResult, attemptNumber }
+        : currentResult
     }
 
     setSubmissionResult(result)
     setSubmitted(true)
     if (activeExamId) {
+      const completed = Boolean(result.passed || Number(result.attemptNumber || 1) >= 2)
       setCompletedExamIds((current) =>
-        current.includes(activeExamId) ? current : [...current, activeExamId],
+        completed
+          ? current.includes(activeExamId) ? current : [...current, activeExamId]
+          : current.filter((id) => id !== activeExamId),
+      )
+      setExams((current) =>
+        current.map((item) =>
+          item.id === activeExamId
+            ? { ...item, result, completed, canRetry: !completed }
+            : item,
+        ),
       )
     }
     return true
-  }, [activeExamId, answers, attemptNumber, exam, sharedBackend])
+  }, [activeExamId, answers, attemptNumber, exam, previousAttemptResult, sharedBackend])
 
   useEffect(() => {
     let active = true
@@ -614,6 +634,7 @@ export function StudentExam({ navigate }) {
   }, [completedExamIds, completionStorageKey])
 
   const startExam = (selectedExam, nextAttemptNumber = selectedExam.canRetry ? 2 : 1) => {
+    setPreviousAttemptResult(nextAttemptNumber > 1 ? submissionResult || selectedExam.result : null)
     setActiveExamId(selectedExam.id)
     setCurrentIndex(0)
     setAnswers({})
@@ -630,6 +651,7 @@ export function StudentExam({ navigate }) {
     setTimeLeft(null)
     setSubmitted(false)
     setSubmissionResult(null)
+    setPreviousAttemptResult(null)
     setAttemptNumber(1)
   }
 
@@ -680,14 +702,14 @@ export function StudentExam({ navigate }) {
     if (result.isConfirmed) await submitExam()
   }
 
-  if (!activeExamId && !availableExams.length) {
-    return <WaitingRoom exam={waitingExam} navigate={navigate} />
+  if (!activeExamId && !scheduledExams.length) {
+    return <WaitingRoom navigate={navigate} />
   }
 
   if (!activeExamId) {
     return (
       <AvailableExams
-        exams={availableExams}
+        exams={scheduledExams}
         completedExamIds={completedExamIds}
         onStart={startExam}
         navigate={navigate}
@@ -709,15 +731,15 @@ export function StudentExam({ navigate }) {
   }
 
   if (!isUnlocked || !currentQuestion) {
-    return availableExams.length ? (
+    return scheduledExams.length ? (
       <AvailableExams
-        exams={availableExams}
+        exams={scheduledExams}
         completedExamIds={completedExamIds}
         onStart={startExam}
         navigate={navigate}
       />
     ) : (
-      <WaitingRoom exam={waitingExam} navigate={navigate} />
+      <WaitingRoom navigate={navigate} />
     )
   }
 
