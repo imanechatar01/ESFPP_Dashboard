@@ -51,7 +51,7 @@ router.get('/stats', async (req, res) => {
         id: p.id,
         created_at: p.created_at,
         title: p.status === 'invited' ? 'Invitation envoyée' : 'Nouveau profil créé',
-        subtitle: `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Utilisateur inconnu'
+        subtitle: `${p.first_name} ${p.last_name}`.trim() || 'Utilisateur inconnu'
       }));
 
     const recentControles = controles
@@ -83,8 +83,7 @@ router.get('/stats', async (req, res) => {
       recentActivity
     });
   } catch (err) {
-    console.error("Dashboard stats error:", err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: err.message });
   }
 });
 
