@@ -12,6 +12,8 @@ import controlsRoutes from './routes/controles.js';
 import formateursRouter from "./routes/formateurs.js"
 import yearsRouter from "./routes/academic-years.js"
 import coursesRouter from "./routes/courses.js"
+import dashboardRouter from "./routes/dashboard.js"
+import examsRouter from "./routes/exams.js"
 
 dotenv.config()
 
@@ -46,9 +48,10 @@ app.get("/api/me", requireAuth, (req, res) => {
 })
 
 // ---------------------------------------------------------------------------
-// Admin — Logigramme & Completion
+// Admin — Logigramme & Completion & Dashboard
 // ---------------------------------------------------------------------------
 
+app.use("/api/dashboard", requireAuth, requireRole("admin"), dashboardRouter);
 app.use("/api/logigramme", requireAuth, requireRole("admin"), logigrammesRouter);
 app.use("/api/completion", requireAuth, requireRole("admin"), completionRouter);
 app.use("/api/filieres", requireAuth, filieresRouter);
@@ -56,6 +59,7 @@ app.use('/api/controles', controlsRoutes);
 app.use("/api/formateurs", requireAuth, requireRole("admin"), formateursRouter);
 app.use("/api/years", requireAuth, requireRole("admin"), yearsRouter);
 app.use("/api/courses", requireAuth, coursesRouter);
+app.use("/api/exams", requireServiceRole, requireAuth, examsRouter);
 
 // ---------------------------------------------------------------------------
 // Student — Read-only Logigramme

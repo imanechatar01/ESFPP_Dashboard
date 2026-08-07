@@ -19,7 +19,9 @@ import {
   Menu,
   X,
   ChevronDown,
-  FileSpreadsheet  // ✅ AJOUTER CET IMPORT
+  FileSpreadsheet,
+  ClipboardCheck,
+  Award
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -54,12 +56,15 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
     ? [
       { label: "Mon espace", path: "/student/dashboard", icon: BookOpen },
       { label: "Cours & Vidéos", path: "/student/courses", icon: BookOpen },
+      { label: "Mes examens", path: "/student/exams", icon: ClipboardCheck },
     ]
     : [
       { label: "Tableau de bord", path: "/admin/dashboard", icon: LayoutDashboard },
       { label: "Comptes", path: "/admin/accounts", icon: Users },
       { label: "Logigrammes", path: "/admin/logigrammes", icon: CalendarDays },
       { label: "Gestion des contrôles", path: "/admin/controls", icon: FileSpreadsheet },
+      { label: "Examens en ligne", path: "/admin/exams", icon: ClipboardCheck },
+      { label: "Notes des étudiants", path: "/admin/exam-results", icon: Award },
       { label: "Filières", path: "/admin/filieres", icon: BookOpen },
       { label: "Cours & Vidéos", path: "/admin/courses", icon: BookOpen },
       { label: "Formateurs", path: "/admin/formateurs", icon: GraduationCap },
@@ -83,7 +88,9 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
         items: [
           { label: "Tableau de bord", path: "/admin/dashboard", icon: LayoutDashboard },
           { label: "Comptes", path: "/admin/accounts", icon: Users },
-          { label: "Gestion des contrôles", path: "/admin/controls", icon: FileSpreadsheet }
+          { label: "Gestion des contrôles", path: "/admin/controls", icon: FileSpreadsheet },
+          { label: "Examens en ligne", path: "/admin/exams", icon: ClipboardCheck },
+          { label: "Notes des étudiants", path: "/admin/exam-results", icon: Award },
         ],
       },
       {
