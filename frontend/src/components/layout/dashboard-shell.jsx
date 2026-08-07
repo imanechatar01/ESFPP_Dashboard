@@ -26,6 +26,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
+import { useNotifications } from "@/hooks/useNotifications"
 
 export function DashboardShell({ title, subtitle, navItems, activePath, navigate, accent = "admin", children }) {
   const { user, role, signOut } = useAuth()
@@ -46,10 +47,16 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
 
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const [isBellOpen, setIsBellOpen] = useState(false)
   const dropdownRef = useRef(null)
+  const bellRef = useRef(null)
 
   const userRole = role || (accent === "student" ? "student" : "admin")
   const isStudent = userRole === "student"
+  const isAdmin = !isStudent
+
+  // Notifications — only loaded for admins
+  const { notifications, unreadCount, markAllRead, markRead } = useNotifications()
 
   // Utiliser navItems passé en props, sinon utiliser les items par défaut
   const defaultNavItems = isStudent
@@ -117,6 +124,9 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
     function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsProfileOpen(false)
+      }
+      if (bellRef.current && !bellRef.current.contains(event.target)) {
+        setIsBellOpen(false)
       }
     }
     document.addEventListener("mousedown", handleClickOutside)
@@ -293,10 +303,78 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
             </div>
 
             <div className="flex items-center gap-3">
-              <button className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-colors relative cursor-pointer">
-                <Bell className="size-4" />
-                <span className="absolute top-2 right-2 size-2 bg-accent rounded-full ring-2 ring-white" />
-              </button>
+              {/* Bell — only shown to admin, wired to real notifications */}
+              {isAdmin && (
+                <div className="relative" ref={bellRef}>
+                  <button
+                    type="button"
+                    id="notifications-bell-btn"
+                    aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} non lues)` : ''}`}
+                    onClick={() => {
+                      const opening = !isBellOpen
+                      setIsBellOpen(opening)
+                      if (opening) markAllRead()
+                    }}
+                    className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-colors relative cursor-pointer"
+                  >
+                    <Bell className="size-4" />
+                    {unreadCount > 0 && (
+                      <span className="absolute top-1.5 right-1.5 min-w-[14px] h-[14px] px-0.5 bg-destructive rounded-full ring-2 ring-white flex items-center justify-center text-[8px] font-black text-white leading-none">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
+                  </button>
+
+                  {isBellOpen && (
+                    <div
+                      id="notifications-dropdown"
+                      className="absolute right-0 top-full mt-2 w-80 rounded-xl border border-border bg-card shadow-2xl shadow-primary/10 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200 medical-glass"
+                    >
+                      <div className="px-3 py-2.5 border-b border-border/60 flex items-center justify-between">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Notifications</p>
+                        {notifications.length > 0 && (
+                          <span className="text-[9px] font-bold text-muted-foreground/60">{notifications.length} récente(s)</span>
+                        )}
+                      </div>
+
+                      <div className="max-h-80 overflow-y-auto divide-y divide-border/40">
+                        {notifications.length === 0 ? (
+                          <div className="px-4 py-6 text-center">
+                            <Bell className="size-6 text-muted-foreground/20 mx-auto mb-2" />
+                            <p className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-wider">Aucune notification</p>
+                          </div>
+                        ) : (
+                          notifications.map(notif => (
+                            <button
+                              key={notif.id}
+                              type="button"
+                              onClick={() => markRead(notif.id)}
+                              className={cn(
+                                "w-full text-left px-3 py-2.5 flex items-start gap-2.5 hover:bg-muted/40 transition-colors",
+                                !notif.is_read && "bg-primary/5"
+                              )}
+                            >
+                              {/* Unread dot */}
+                              <span
+                                className={cn(
+                                  "mt-1 shrink-0 size-1.5 rounded-full",
+                                  notif.is_read ? "bg-transparent" : "bg-destructive"
+                                )}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[10px] font-bold text-foreground leading-snug line-clamp-3">{notif.message}</p>
+                                <p className="text-[9px] text-muted-foreground mt-0.5">
+                                  {new Date(notif.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                              </div>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="h-6 w-px bg-slate-200 mx-1.5" />
 
