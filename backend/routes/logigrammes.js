@@ -26,15 +26,24 @@ const upload = multer({ dest: uploadDir });
  */
 function safeUnlink(filePath) {
   if (!filePath) return;
-  const resolved = path.resolve(filePath);
-  if (!resolved.startsWith(uploadDir + path.sep) && resolved !== uploadDir) {
-    console.error('[security] Blocked attempt to delete file outside uploadDir:', resolved);
+  
+  // 1. Extraction du nom de fichier pur (supprime tout répertoire ou segment ../)
+  const safeName = path.basename(filePath);
+  
+  // 2. Re-construction sécurisée dans le répertoire de base (uploadDir)
+  const resolved = path.join(uploadDir, safeName);
+  
+  // 3. Vérification de sécurité
+  const finalPath = path.resolve(resolved);
+  if (!finalPath.startsWith(uploadDir + path.sep) && finalPath !== uploadDir) {
+    console.error('[security] Blocked attempt to delete file outside uploadDir:', finalPath);
     return;
   }
+  
   try {
-    if (fs.existsSync(resolved)) fs.unlinkSync(resolved);
+    if (fs.existsSync(finalPath)) fs.unlinkSync(finalPath);
   } catch (e) {
-    console.error('[cleanup] Failed to delete temp file:', String(resolved), '-', String(e.message));
+    console.error('[cleanup] Failed to delete temp file:', String(finalPath), '-', String(e.message));
   }
 }
 
