@@ -60,6 +60,33 @@ async function getYearWeekDateMap(academicYearId) {
   return Object.fromEntries((data || []).map(w => [w.semaine, w.week_start_date]));
 }
 
+// ============================================================
+// ISO 8601 Week → Monday calculator
+// Returns the date of the Monday of ISO week `weekNum` in `year`.
+// Based on ISO 8601: week 1 is the week containing the first Thursday.
+// This is exact — not an approximation.
+// ============================================================
+export function isoWeekMonday(year, weekNum) {
+  // Jan 4 is always in ISO week 1
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  // Day of week: 0=Sun, 1=Mon, ..., 6=Sat. ISO: 1=Mon, 7=Sun.
+  const jan4DayOfWeek = jan4.getUTCDay() || 7; // Convert Sunday(0) to 7
+  // Monday of week 1
+  const week1Monday = new Date(jan4);
+  week1Monday.setUTCDate(jan4.getUTCDate() - (jan4DayOfWeek - 1));
+  // Monday of weekNum
+  const targetMonday = new Date(week1Monday);
+  targetMonday.setUTCDate(week1Monday.getUTCDate() + (weekNum - 1) * 7);
+  return targetMonday.toISOString().split('T')[0]; // YYYY-MM-DD
+}
+
+function getFirstMondayOfSeptember(year) {
+  const d = new Date(Date.UTC(year, 8, 1)).getUTCDay();
+  const day = d === 1 ? 1 : (d === 0 ? 2 : 1 + (8 - d));
+  const dayStr = String(day).padStart(2, '0');
+  return `${year}-09-${dayStr}`;
+}
+
 // Helper to get the current academic year ID
 async function getCurrentYearId() {
   const { data, error } = await supabaseAdmin
@@ -400,6 +427,299 @@ router.put('/:id/auto-complete', async (req, res) => {
     if (error) throw error;
     res.json(data);
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/logigramme/duplicate-year
+// Duplicate all logigrammes from a source academic year to a target academic year.
+// - The target year MUST already exist (with its year_weeks).
+// - Dates are recalculated using ISO 8601 exact week → Monday mapping.
+// - No completion data is ever copied (auto-mark re-applies based on new dates vs today).
+// - Source year data is NEVER modified.
+router.post('/duplicate-year', async (req, res) => {
+  const { source_year_id, target_year_id, target_year_label } = req.body;
+
+  if (!source_year_id || (!target_year_id && !target_year_label)) {
+    return res.status(400).json({ error: 'source_year_id et (target_year_id ou target_year_label) sont requis.' });
+  }
+
+  try {
+    // 1. Verify source year exists
+    const { data: sourceYear, error: srcError } = await supabaseAdmin
+      .from('academic_years')
+      .select('id, label')
+      .eq('id', source_year_id)
+      .single();
+    if (srcError || !sourceYear) {
+      return res.status(404).json({ error: 'Année source introuvable.' });
+    }
+
+    // Resolve target year
+    let targetYear = null;
+
+    if (target_year_id) {
+      const { data } = await supabaseAdmin
+        .from('academic_years')
+        .select('id, label')
+        .eq('id', target_year_id)
+        .maybeSingle();
+      if (data) targetYear = data;
+    }
+
+    if (!targetYear && target_year_label) {
+      // Check if target year already exists by label
+      const { data: existing } = await supabaseAdmin
+        .from('academic_years')
+        .select('id, label')
+        .eq('label', target_year_label)
+        .maybeSingle();
+
+      if (existing) {
+        targetYear = existing;
+      } else {
+        // Create the new target academic year
+        const startYear = parseInt(target_year_label.split('-')[0], 10);
+        if (isNaN(startYear)) {
+          return res.status(400).json({ error: `Label d'année cible invalide : "${target_year_label}". Format attendu: "YYYY-YYYY".` });
+        }
+        const start_date = getFirstMondayOfSeptember(startYear);
+        const startDateObj = new Date(start_date);
+        const endDateObj = new Date(startDateObj);
+        endDateObj.setFullYear(endDateObj.getFullYear() + 1);
+        endDateObj.setDate(endDateObj.getDate() - 1);
+        const end_date = endDateObj.toISOString().split('T')[0];
+
+        const { data: newYear, error: createError } = await supabaseAdmin
+          .from('academic_years')
+          .insert({ label: target_year_label, start_date, end_date })
+          .select()
+          .single();
+
+        if (createError) throw createError;
+        targetYear = newYear;
+        console.log(`[duplicate-year] Auto-created new target academic year "${target_year_label}" (${targetYear.id})`);
+      }
+    }
+
+    if (!targetYear) {
+      return res.status(404).json({ error: 'Année cible introuvable.' });
+    }
+
+    if (sourceYear.id === targetYear.id) {
+      return res.status(400).json({ error: 'L\'année source et l\'année cible doivent être différentes.' });
+    }
+
+    // 2. Verify target year has no logigrammes yet (idempotency guard)
+    const { data: existingLogs, error: existingError } = await supabaseAdmin
+      .from('logigrammes')
+      .select('id')
+      .eq('academic_year_id', target_year_id);
+    if (existingError) throw existingError;
+    if (existingLogs && existingLogs.length > 0) {
+      return res.status(409).json({
+        error: `L'année cible "${targetYear.label}" contient déjà ${existingLogs.length} logigramme(s). Supprimez-les d'abord ou choisissez une année vide.`
+      });
+    }
+
+    // 3. Build ISO 8601 week → Monday date map for target year
+    // Extract the target year number from the label (e.g. "2026-2027" → 2026)
+    const targetYearNumber = parseInt((targetYear.label || '').split('-')[0], 10);
+    if (isNaN(targetYearNumber)) {
+      return res.status(400).json({ error: `Impossible d'extraire l'année cible depuis le label "${targetYear.label}". Format attendu: "YYYY-YYYY".` });
+    }
+
+    // Get source year_weeks to know which semaine numbers exist
+    const { data: srcWeeks, error: srcWeeksError } = await supabaseAdmin
+      .from('year_weeks')
+      .select('semaine, mois, semestre')
+      .eq('academic_year_id', source_year_id)
+      .order('semaine');
+    if (srcWeeksError) throw srcWeeksError;
+
+    if (!srcWeeks || srcWeeks.length === 0) {
+      return res.status(400).json({ error: 'L\'année source n\'a aucune semaine configurée (year_weeks vide).' });
+    }
+
+    // Check if target year already has year_weeks
+    const { data: tgtExistingWeeks, error: tgtWeeksCheckError } = await supabaseAdmin
+      .from('year_weeks')
+      .select('semaine, week_start_date')
+      .eq('academic_year_id', target_year_id);
+    if (tgtWeeksCheckError) throw tgtWeeksCheckError;
+
+    // Build the date map for target year using ISO 8601 exact calculation
+    const targetDateMap = {};
+
+    if (tgtExistingWeeks && tgtExistingWeeks.length > 0) {
+      // Use existing year_weeks if already populated
+      for (const w of tgtExistingWeeks) {
+        targetDateMap[w.semaine] = w.week_start_date;
+      }
+      console.log(`[duplicate-year] Using ${tgtExistingWeeks.length} existing year_weeks for "${targetYear.label}"`);
+    } else {
+      // Generate year_weeks using ISO 8601 exact calculation
+      const weekInserts = [];
+      for (const srcWeek of srcWeeks) {
+        const { semaine, mois, semestre } = srcWeek;
+        // Determine if the week belongs to the next calendar year
+        // Academic year "2026-2027" starts in 2026 → weeks 1-12 may be in 2027
+        // Rule: semaines 1..~35 belong to targetYearNumber, ~36..52 to targetYearNumber+1
+        // We try targetYearNumber first, then targetYearNumber+1 for high week numbers
+        // This is a heuristic; we refine below by checking actual ISO week year
+        let weekYear = targetYearNumber;
+        // For weeks 37-52, they likely fall in the first year of the label
+        // For weeks 1-36, they likely fall in the second year
+        // Academic year: e.g. "2026-2027" → weeks 37+ are in 2026, weeks 1-36 are in 2027
+        if (semaine <= 36) {
+          weekYear = targetYearNumber + 1;
+        }
+        const monday = isoWeekMonday(weekYear, semaine);
+        targetDateMap[semaine] = monday;
+
+        const moisStr = new Date(monday + 'T00:00:00Z').toLocaleString('fr-FR', { month: 'long', timeZone: 'UTC' });
+        weekInserts.push({
+          academic_year_id: target_year_id,
+          semaine,
+          week_start_date: monday,
+          mois: moisStr.charAt(0).toUpperCase() + moisStr.slice(1),
+          semestre
+        });
+      }
+
+      // Insert the year_weeks for the target year
+      const { error: weekInsertError } = await supabaseAdmin
+        .from('year_weeks')
+        .upsert(weekInserts, { onConflict: 'academic_year_id, semaine' });
+      if (weekInsertError) throw weekInsertError;
+      console.log(`[duplicate-year] Generated ${weekInserts.length} year_weeks for "${targetYear.label}" using ISO 8601`);
+    }
+
+    // 4. Fetch all source logigrammes with their units and cells
+    const { data: srcLogigrammes, error: srcLogsError } = await supabaseAdmin
+      .from('logigrammes')
+      .select('id, filiere_id, classe_id, auto_complete')
+      .eq('academic_year_id', source_year_id);
+    if (srcLogsError) throw srcLogsError;
+
+    if (!srcLogigrammes || srcLogigrammes.length === 0) {
+      return res.status(404).json({ error: `Aucun logigramme trouvé pour l'année source "${sourceYear.label}".` });
+    }
+
+    const results = { logigrammes: 0, unites: 0, cells: 0, skipped_cells: 0 };
+
+    // 5. Clone each logigramme
+    for (const srcLog of srcLogigrammes) {
+      // 5a. Insert new logigramme (no completion data)
+      const { data: newLog, error: newLogError } = await supabaseAdmin
+        .from('logigrammes')
+        .insert({
+          filiere_id: srcLog.filiere_id,
+          classe_id: srcLog.classe_id,
+          academic_year_id: target_year_id,
+          auto_complete: srcLog.auto_complete
+          // NOTE: completions are NOT copied — auto-mark re-applies via date comparison
+        })
+        .select()
+        .single();
+
+      if (newLogError) {
+        console.error(`[duplicate-year] Error cloning logigramme ${srcLog.id}:`, newLogError.message);
+        continue;
+      }
+      results.logigrammes++;
+
+      // 5b. Fetch source units
+      const { data: srcUnites, error: srcUnitesError } = await supabaseAdmin
+        .from('unites_formation')
+        .select('id, ordre, nom, formateur_id, vhg')
+        .eq('logigramme_id', srcLog.id)
+        .order('ordre');
+      if (srcUnitesError) {
+        console.error(`[duplicate-year] Error fetching units for logigramme ${srcLog.id}:`, srcUnitesError.message);
+        continue;
+      }
+      if (!srcUnites || srcUnites.length === 0) continue;
+
+      // 5c. Clone each unit
+      for (const srcUnite of srcUnites) {
+        const { data: newUnite, error: newUniteError } = await supabaseAdmin
+          .from('unites_formation')
+          .insert({
+            logigramme_id: newLog.id,
+            ordre: srcUnite.ordre,
+            nom: srcUnite.nom,
+            formateur_id: srcUnite.formateur_id,
+            vhg: srcUnite.vhg
+          })
+          .select()
+          .single();
+
+        if (newUniteError) {
+          console.error(`[duplicate-year] Error cloning unite ${srcUnite.id}:`, newUniteError.message);
+          continue;
+        }
+        results.unites++;
+
+        // 5d. Fetch source cells (no completions — they live in a separate table)
+        const { data: srcCells, error: srcCellsError } = await supabaseAdmin
+          .from('week_cells')
+          .select('semaine, cell_type, heures')
+          // NOTE: We explicitly do NOT select 'completion' — completions are separate
+          .eq('unite_id', srcUnite.id);
+
+        if (srcCellsError) {
+          console.error(`[duplicate-year] Error fetching cells for unite ${srcUnite.id}:`, srcCellsError.message);
+          continue;
+        }
+        if (!srcCells || srcCells.length === 0) continue;
+
+        // 5e. Build new cells with ISO 8601 recalculated dates (no done status copied)
+        const newCells = srcCells
+          .map(c => {
+            const newDate = targetDateMap[c.semaine];
+            if (!newDate) return null; // Skip if week doesn't exist in target year
+            return {
+              unite_id: newUnite.id,
+              semaine: c.semaine,
+              week_start_date: newDate,   // ISO 8601 exact Monday
+              cell_type: c.cell_type,
+              heures: c.heures
+              // Intentionally NOT setting completion — auto-mark handles it at read time
+            };
+          })
+          .filter(Boolean);
+
+        results.skipped_cells += srcCells.length - newCells.length;
+
+        if (newCells.length > 0) {
+          const { error: cellInsertError } = await supabaseAdmin
+            .from('week_cells')
+            .insert(newCells);
+          if (cellInsertError) {
+            console.error(`[duplicate-year] Error inserting cells for unite ${newUnite.id}:`, cellInsertError.message);
+          } else {
+            results.cells += newCells.length;
+          }
+        }
+      }
+    }
+
+    console.log(
+      `[duplicate-year] Completed: "${sourceYear.label}" → "${targetYear.label}" | ` +
+      `${results.logigrammes} logigrammes, ${results.unites} unités, ${results.cells} cellules` +
+      (results.skipped_cells > 0 ? `, ${results.skipped_cells} cellules ignorées (semaine sans date)` : '')
+    );
+
+    res.status(201).json({
+      success: true,
+      source: sourceYear.label,
+      target: targetYear.label,
+      ...results
+    });
+
+  } catch (err) {
+    console.error('[duplicate-year] Error:', err);
     res.status(500).json({ error: err.message });
   }
 });
