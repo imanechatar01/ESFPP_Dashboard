@@ -167,10 +167,9 @@ router.get('/kpis', async (req, res) => {
       for (const cell of cells) {
         if (cell.cell_type === 'normal') {
           let status = cell.completion?.status;
-          if (!status || status === 'pending') {
-            if (cell.week_start_date && cell.week_start_date < today) {
-              status = 'auto_done';
-            }
+          // Only auto-done if there is NO explicit DB completion row
+          if (!cell.completion && cell.week_start_date && cell.week_start_date < today) {
+            status = 'auto_done';
           }
           if (status === 'done' || status === 'auto_done') {
             totalRealise += (parseFloat(cell.heures) || 0);
@@ -273,10 +272,9 @@ router.get('/list', async (req, res) => {
         for (const cell of cells) {
           if (cell.cell_type === 'normal') {
             let status = cell.completion?.status;
-            if (!status || status === 'pending') {
-              if (cell.week_start_date && cell.week_start_date < today) {
-                status = 'auto_done';
-              }
+            // Only auto-done if there is NO explicit DB completion row
+            if (!cell.completion && cell.week_start_date && cell.week_start_date < today) {
+              status = 'auto_done';
             }
             if (status === 'done' || status === 'auto_done') {
               vh_realise += parseFloat(cell.heures) || 0;
@@ -357,10 +355,10 @@ router.get('/:id', async (req, res) => {
     const processedUnites = unites.map(u => {
       const processedCells = u.cells.map(c => {
         let status = c.completion?.status || 'pending';
-        if (status === 'pending') {
-          if (c.week_start_date && c.week_start_date < today) {
-            status = 'auto_done';
-          }
+        // Only auto-done if there is NO explicit completion row in the DB.
+        // If the admin explicitly set status to 'pending' (un-toggle), respect it.
+        if (!c.completion && c.week_start_date && c.week_start_date < today) {
+          status = 'auto_done';
         }
         return {
           ...c,

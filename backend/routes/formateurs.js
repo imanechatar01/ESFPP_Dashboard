@@ -179,10 +179,10 @@ router.get('/:id/unites', async (req, res) => {
     const processedUnits = filteredUnits.map(u => {
       const processedCells = u.cells.map(c => {
         let status = c.completion?.status || 'pending';
-        if (status === 'pending') {
-          if (c.week_start_date && c.week_start_date < today) {
-            status = 'auto_done';
-          }
+        // Only auto-done if there is NO explicit completion row in the DB.
+        // If the admin explicitly set status to 'pending' (un-toggle), respect it.
+        if (!c.completion && c.week_start_date && c.week_start_date < today) {
+          status = 'auto_done';
         }
         return {
           ...c,
