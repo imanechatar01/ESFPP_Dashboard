@@ -299,8 +299,8 @@ function getCellColor(cell) {
   switch (cell.cell_type) {
     case 'vacation':  return '#F472B6';
     case 'exam':
-      // Pending = soft red; Done = deep teal-green (distinct from normal done mint)
-      return isDone ? '#134e3a' : '#fee2d8';
+      // Pending = slightly darker soft red; Done = deep teal-green (distinct from normal done mint)
+      return isDone ? '#134e3a' : '#fca5a5';
     case 'tiff':      return '#facc15';
     case 'normal':
       if (isDone) {

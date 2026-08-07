@@ -65,7 +65,7 @@
   --foreground: oklch(0.25 0.06 230); /* Dark medical blue for text */
 
   /* Exam cell: red = not done yet (distinct from destructive) */
-  --exam-pending: oklch(0.92 0.06 20);
+  --exam-pending: oklch(0.86 0.09 20);
   --exam-pending-fg: oklch(0.40 0.16 22);
   /* Exam cell: deep teal-green = validated (distinct from normal 'done' mint) */
   --exam-done: oklch(0.36 0.10 165);
