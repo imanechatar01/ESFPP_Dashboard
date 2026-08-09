@@ -1,4 +1,5 @@
 import express from "express"
+import { createServer } from "http"
 import dotenv from "dotenv"
 import cors from "cors"
 import { supabase, supabaseAdmin } from "./lib/supabase.js"
@@ -16,6 +17,7 @@ import dashboardRouter from "./routes/dashboard.js"
 import examsRouter from "./routes/exams.js"
 import notificationsRouter from "./routes/notifications.js"
 import { startExamReminderScheduler } from "./lib/exam-reminder-scheduler.js"
+import { initWsBroadcaster } from "./lib/ws-broadcaster.js"
 
 dotenv.config()
 
@@ -364,16 +366,19 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: "Internal server error" })
 })
 
-const server = app.listen(PORT);
+const httpServer = createServer(app);
 
-server.on('listening', () => {
+// Attach WebSocket broadcaster (real-time admin notifications)
+initWsBroadcaster(httpServer);
+
+httpServer.listen(PORT, () => {
   console.log(`Backend started on http://localhost:${PORT}`);
   // Start the exam-reminder scheduler after the server is ready.
   // Runs once 5 s after boot, then every 24 h.
   startExamReminderScheduler();
 });
 
-server.on('error', (err) => {
+httpServer.on('error', (err) => {
   console.error(`Failed to start server:`, err);
   process.exit(1);
 });

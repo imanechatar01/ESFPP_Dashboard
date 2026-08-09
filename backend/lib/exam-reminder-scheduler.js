@@ -9,6 +9,7 @@
 // even if the interval fires twice (e.g., after a server restart on the same day).
 
 import { supabaseAdmin } from './supabase.js';
+import { broadcastToAdmins } from './ws-broadcaster.js';
 
 const INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -110,6 +111,19 @@ export async function runExamReminderCheck() {
       });
 
     if (insertError) throw insertError;
+
+    // Broadcast each notification to connected admin sockets
+    for (const notif of notifications) {
+      broadcastToAdmins('notification:new', {
+        id: `temp-${notif.exam_cell_id}-${notif.notified_date}`,
+        type: notif.type,
+        exam_cell_id: notif.exam_cell_id,
+        notified_date: notif.notified_date,
+        message: notif.message,
+        is_read: false,
+        created_at: new Date().toISOString(),
+      });
+    }
 
     console.log(`[exam-reminder] Inserted/skipped ${notifications.length} notification(s) for ${todayISO}.`);
   } catch (err) {

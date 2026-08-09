@@ -21,7 +21,11 @@ import {
   ChevronDown,
   FileSpreadsheet,
   ClipboardCheck,
-  Award
+  Award,
+  CheckCheck,
+  Trash2,
+  ClipboardList,
+  BellRing
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -48,6 +52,7 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [isBellOpen, setIsBellOpen] = useState(false)
+  const [showClearConfirm, setShowClearConfirm] = useState(false)
   const dropdownRef = useRef(null)
   const bellRef = useRef(null)
 
@@ -56,7 +61,7 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
   const isAdmin = !isStudent
 
   // Notifications — only loaded for admins
-  const { notifications, unreadCount, markAllRead, markRead } = useNotifications()
+  const { notifications, unreadCount, markAllRead, markRead, clearAll } = useNotifications()
 
   // Utiliser navItems passé en props, sinon utiliser les items par défaut
   const defaultNavItems = isStudent
@@ -313,13 +318,13 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
                     onClick={() => {
                       const opening = !isBellOpen
                       setIsBellOpen(opening)
-                      if (opening) markAllRead()
+                      if (!opening) setShowClearConfirm(false)
                     }}
-                    className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-colors relative cursor-pointer"
+                    className="p-2 rounded-xl text-slate-400 hover:text-primary hover:bg-primary/8 border border-transparent hover:border-primary/15 transition-all relative cursor-pointer"
                   >
-                    <Bell className="size-4" />
+                    {unreadCount > 0 ? <BellRing className="size-4 text-primary animate-bounce-short" /> : <Bell className="size-4" />}
                     {unreadCount > 0 && (
-                      <span className="absolute top-1.5 right-1.5 min-w-[14px] h-[14px] px-0.5 bg-destructive rounded-full ring-2 ring-white flex items-center justify-center text-[8px] font-black text-white leading-none">
+                      <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-0.5 bg-destructive rounded-full ring-2 ring-white flex items-center justify-center text-[8px] font-black text-white leading-none">
                         {unreadCount > 9 ? '9+' : unreadCount}
                       </span>
                     )}
@@ -328,20 +333,79 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
                   {isBellOpen && (
                     <div
                       id="notifications-dropdown"
-                      className="absolute right-0 top-full mt-2 w-80 rounded-xl border border-border bg-card shadow-2xl shadow-primary/10 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200 medical-glass"
+                      className="absolute right-0 top-full mt-2 w-96 rounded-2xl border border-border/50 bg-white/95 shadow-2xl shadow-primary/12 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+                      style={{ backdropFilter: 'blur(16px)' }}
                     >
-                      <div className="px-3 py-2.5 border-b border-border/60 flex items-center justify-between">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Notifications</p>
-                        {notifications.length > 0 && (
-                          <span className="text-[9px] font-bold text-muted-foreground/60">{notifications.length} récente(s)</span>
+                      {/* Header */}
+                      <div className="px-4 py-3 border-b border-border/50 bg-gradient-to-r from-primary/5 to-secondary/10">
+                        <div className="flex items-center justify-between mb-2.5">
+                          <div className="flex items-center gap-2">
+                            <div className="p-1 rounded-lg bg-primary/10">
+                              <Bell className="size-3.5 text-primary" />
+                            </div>
+                            <p className="text-[11px] font-black uppercase tracking-widest text-primary">Notifications</p>
+                            {unreadCount > 0 && (
+                              <span className="px-1.5 py-0.5 bg-destructive text-white text-[8px] font-black rounded-full">
+                                {unreadCount} non lue{unreadCount > 1 ? 's' : ''}
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => { setIsBellOpen(false); setShowClearConfirm(false); }}
+                            className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+                          >
+                            <X className="size-3" />
+                          </button>
+                        </div>
+                        {/* Action buttons */}
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={unreadCount === 0}
+                            onClick={markAllRead}
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-bold text-primary bg-primary/8 hover:bg-primary/15 border border-primary/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                          >
+                            <CheckCheck className="size-3" />
+                            Tout marquer lu
+                          </button>
+                          <button
+                            type="button"
+                            disabled={notifications.length === 0}
+                            onClick={() => setShowClearConfirm(true)}
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-bold text-destructive bg-destructive/8 hover:bg-destructive/15 border border-destructive/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                          >
+                            <Trash2 className="size-3" />
+                            Tout effacer
+                          </button>
+                        </div>
+                        {/* Inline confirm */}
+                        {showClearConfirm && (
+                          <div className="mt-2 flex items-center gap-2 p-2 rounded-xl bg-destructive/8 border border-destructive/20 animate-in fade-in slide-in-from-top-1 duration-150">
+                            <p className="text-[9px] font-bold text-destructive flex-1">Supprimer définitivement toutes les notifications ?</p>
+                            <button
+                              type="button"
+                              onClick={async () => { await clearAll(); setShowClearConfirm(false); setIsBellOpen(false); }}
+                              className="px-2 py-0.5 rounded-md bg-destructive text-white text-[9px] font-black hover:bg-destructive/90 transition-colors cursor-pointer"
+                            >Confirmer</button>
+                            <button
+                              type="button"
+                              onClick={() => setShowClearConfirm(false)}
+                              className="px-2 py-0.5 rounded-md bg-muted text-muted-foreground text-[9px] font-black hover:bg-muted/80 transition-colors cursor-pointer"
+                            >Annuler</button>
+                          </div>
                         )}
                       </div>
 
-                      <div className="max-h-80 overflow-y-auto divide-y divide-border/40">
+                      {/* Notification list */}
+                      <div className="max-h-80 overflow-y-auto divide-y divide-border/30">
                         {notifications.length === 0 ? (
-                          <div className="px-4 py-6 text-center">
-                            <Bell className="size-6 text-muted-foreground/20 mx-auto mb-2" />
-                            <p className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-wider">Aucune notification</p>
+                          <div className="px-4 py-10 text-center">
+                            <div className="size-12 rounded-2xl bg-muted/60 flex items-center justify-center mx-auto mb-3">
+                              <Bell className="size-5 text-muted-foreground/30" />
+                            </div>
+                            <p className="text-[11px] font-bold text-muted-foreground/50 uppercase tracking-wider">Aucune notification</p>
+                            <p className="text-[9px] text-muted-foreground/30 mt-1">Les alertes d'examen apparaîtront ici</p>
                           </div>
                         ) : (
                           notifications.map(notif => (
@@ -350,27 +414,46 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
                               type="button"
                               onClick={() => markRead(notif.id)}
                               className={cn(
-                                "w-full text-left px-3 py-2.5 flex items-start gap-2.5 hover:bg-muted/40 transition-colors",
-                                !notif.is_read && "bg-primary/5"
+                                "w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-muted/30 transition-colors group",
+                                !notif.is_read && "bg-primary/4"
                               )}
                             >
-                              {/* Unread dot */}
-                              <span
-                                className={cn(
-                                  "mt-1 shrink-0 size-1.5 rounded-full",
-                                  notif.is_read ? "bg-transparent" : "bg-destructive"
-                                )}
-                              />
+                              {/* Icon */}
+                              <div className={cn(
+                                "mt-0.5 shrink-0 p-1.5 rounded-lg transition-colors",
+                                !notif.is_read ? "bg-primary/12 text-primary" : "bg-muted/60 text-muted-foreground"
+                              )}>
+                                <ClipboardList className="size-3" />
+                              </div>
+
                               <div className="flex-1 min-w-0">
-                                <p className="text-[10px] font-bold text-foreground leading-snug line-clamp-3">{notif.message}</p>
-                                <p className="text-[9px] text-muted-foreground mt-0.5">
-                                  {new Date(notif.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                <div className="flex items-start justify-between gap-2">
+                                  <p className={cn(
+                                    "text-[10px] leading-snug line-clamp-2",
+                                    !notif.is_read ? "font-bold text-slate-800" : "font-medium text-muted-foreground"
+                                  )}>{notif.message}</p>
+                                  {/* Unread dot */}
+                                  {!notif.is_read && (
+                                    <span className="mt-1 shrink-0 size-1.5 rounded-full bg-primary" />
+                                  )}
+                                </div>
+                                <p className="text-[9px] text-muted-foreground/60 mt-1 font-medium">
+                                  {formatRelativeTime(notif.created_at)}
                                 </p>
                               </div>
                             </button>
                           ))
                         )}
                       </div>
+
+                      {/* Footer */}
+                      {notifications.length > 0 && (
+                        <div className="px-4 py-2 border-t border-border/40 bg-muted/20">
+                          <p className="text-[9px] text-muted-foreground/50 text-center">
+                            {notifications.length} notification{notifications.length > 1 ? 's' : ''} · Mis à jour en temps réel
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -435,4 +518,13 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
       </div>
     </main>
   )
+}
+
+function formatRelativeTime(dateStr) {
+  if (!dateStr) return '';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  if (diff < 60_000) return "À l'instant";
+  if (diff < 3_600_000) return `Il y a ${Math.floor(diff / 60_000)} min`;
+  if (diff < 86_400_000) return `Il y a ${Math.floor(diff / 3_600_000)} h`;
+  return new Date(dateStr).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
 }

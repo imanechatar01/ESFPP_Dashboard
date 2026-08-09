@@ -60,4 +60,20 @@ router.patch('/read-all', async (_req, res) => {
   }
 });
 
+// DELETE /api/notifications/clear-all
+// Deletes all notifications (destructive, requires confirmation on client side).
+router.delete('/clear-all', async (_req, res) => {
+  try {
+    const { error } = await supabaseAdmin
+      .from('admin_notifications')
+      .delete()
+      .gte('created_at', '1970-01-01'); // Matches all rows (Supabase requires a filter for DELETE)
+
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;
