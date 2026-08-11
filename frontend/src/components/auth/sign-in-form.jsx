@@ -1,3 +1,4 @@
+// frontend/src/components/auth/sign-in-form.jsx
 import { useState } from "react"
 import { Mail, Loader2, KeyRound, ArrowRight, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -69,12 +70,14 @@ export function SignInForm({ navigate }) {
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between px-1">
             <Label htmlFor="password" name="password" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Mot de passe</Label>
-            <a
-              href="#"
-              className="text-[11px] font-bold text-primary hover:underline underline-offset-4 uppercase tracking-wider"
+            {/* ✅ MODIFICATION : Remplacer href="#" par onClick */}
+            <button
+              type="button"
+              onClick={() => navigate('/forgot-password')}
+              className="text-[11px] font-bold text-primary hover:underline underline-offset-4 uppercase tracking-wider transition-colors"
             >
               Oublié ?
-            </a>
+            </button>
           </div>
           <div className="relative">
              <KeyRound className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/50 z-10" />
@@ -122,4 +125,3 @@ export function SignInForm({ navigate }) {
     </div>
   )
 }
-

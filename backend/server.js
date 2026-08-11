@@ -4,6 +4,7 @@ import cors from "cors"
 import { supabase, supabaseAdmin } from "./lib/supabase.js"
 import { requireAuth, requireRole, requireServiceRole, getRole } from "./lib/auth.js"
 
+
 // Routes
 import logigrammesRouter from "./routes/logigrammes.js"
 import completionRouter from "./routes/completion.js"
@@ -14,6 +15,10 @@ import yearsRouter from "./routes/academic-years.js"
 import coursesRouter from "./routes/courses.js"
 import dashboardRouter from "./routes/dashboard.js"
 import examsRouter from "./routes/exams.js"
+
+import authRoutes from './routes/auth.js';
+
+
 
 dotenv.config()
 
@@ -361,6 +366,7 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: "Internal server error" })
 })
 
+app.use('/api/auth', authRoutes);
 const server = app.listen(PORT);
 
 server.on('listening', () => {
