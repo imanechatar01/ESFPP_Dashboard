@@ -42,6 +42,7 @@ export function FormateurVue({ formateurId }) {
     try {
       // Build query parameters with all filters
       const queryParams = new URLSearchParams();
+      if (filters.year_id) queryParams.append('year_id', filters.year_id);
       if (filters.niveau_id) queryParams.append('niveau_id', filters.niveau_id);
       if (filters.filiere_id) queryParams.append('filiere_id', filters.filiere_id);
       if (filters.classe_id) queryParams.append('classe_id', filters.classe_id);

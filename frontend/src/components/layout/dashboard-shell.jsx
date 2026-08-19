@@ -31,9 +31,12 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
 import { useNotifications } from "@/hooks/useNotifications"
+import { useLogigrammeContext } from "@/contexts/logigramme-context"
 
 export function DashboardShell({ title, subtitle, navItems, activePath, navigate, accent = "admin", children }) {
   const { user, role, signOut } = useAuth()
+  const logContext = useLogigrammeContext()
+  const { setFilter, setHighlightUniteId, setHighlightWeek, setHighlightCellId, setHighlightLogigrammeId } = logContext || {}
 
   // isPinned = sidebar locked open by a deliberate click (persisted)
   // isHoverOpen = sidebar temporarily open by a 3-second hover preview (ephemeral)
@@ -412,9 +415,41 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
                             <button
                               key={notif.id}
                               type="button"
-                              onClick={() => markRead(notif.id)}
+                              onClick={() => {
+                                markRead(notif.id)
+                                setIsBellOpen(false)
+                                if (navigate) {
+                                  const examCell = notif.exam_cell
+                                  if (examCell) {
+                                    const logId = examCell.unite?.logigramme_id
+                                    const uniteId = examCell.unite_id
+                                    const semaine = examCell.semaine
+                                    const cellId = examCell.id
+                                    const formateurId = examCell.unite?.formateur_id
+
+                                    if (setHighlightLogigrammeId) setHighlightLogigrammeId(logId || null)
+                                    if (setHighlightUniteId) setHighlightUniteId(uniteId || null)
+                                    if (setHighlightWeek) setHighlightWeek(semaine || null)
+                                    if (setHighlightCellId) setHighlightCellId(cellId || null)
+
+                                    if (setFilter) {
+                                      // If formateur_id is present, we can filter by it
+                                      if (formateurId) {
+                                        setFilter('formateur_id', formateurId)
+                                      } else {
+                                        setFilter('formateur_id', null)
+                                      }
+                                    }
+
+                                    const targetPath = isAdmin ? '/admin/logigrammes' : '/student/logigrammes'
+                                    navigate(targetPath)
+                                  } else {
+                                    navigate(isAdmin ? '/admin/logigrammes' : '/student/logigrammes')
+                                  }
+                                }
+                              }}
                               className={cn(
-                                "w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-muted/30 transition-colors group",
+                                "w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-muted/30 transition-colors group cursor-pointer",
                                 !notif.is_read && "bg-primary/4"
                               )}
                             >

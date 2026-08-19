@@ -23,7 +23,7 @@ const navItems = [
 ]
 
 export function LogigrammeView({ path, navigate }) {
-  const { filters } = useLogigrammeContext()
+  const { filters, highlightLogigrammeId } = useLogigrammeContext()
   const [list, setList] = useState([])
   const [loadingList, setLoadingList] = useState(false)
   const [activeLogId, setActiveLogId] = useState(null)
@@ -31,6 +31,12 @@ export function LogigrammeView({ path, navigate }) {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+
+  useEffect(() => {
+    if (highlightLogigrammeId) {
+      setActiveLogId(highlightLogigrammeId)
+    }
+  }, [highlightLogigrammeId])
 
   const {
     data: activeLog,

@@ -106,12 +106,21 @@ export function LogigrammeProvider({ children }) {
     setFiltersState({ ...defaultFilters, year_id: current?.id ?? null });
   };
 
+  const [highlightUniteId, setHighlightUniteId] = useState(null);
+  const [highlightWeek, setHighlightWeek] = useState(null);
+  const [highlightCellId, setHighlightCellId] = useState(null);
+  const [highlightLogigrammeId, setHighlightLogigrammeId] = useState(null);
+
   return (
     <LogigrammeContext.Provider value={{
       filters, setFilter, resetFilters,
       years, filieres, formateurs, classes, niveaux,
       loading, refreshLookups: loadLookups,
-      kpis, loadingKpis, refreshKpis: fetchKpis
+      kpis, loadingKpis, refreshKpis: fetchKpis,
+      highlightUniteId, setHighlightUniteId,
+      highlightWeek, setHighlightWeek,
+      highlightCellId, setHighlightCellId,
+      highlightLogigrammeId, setHighlightLogigrammeId
     }}>
     {children}
     </LogigrammeContext.Provider>

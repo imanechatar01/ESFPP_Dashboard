@@ -42,6 +42,8 @@ export async function runExamReminderCheck() {
         unite:unites_formation (
           id,
           nom,
+          formateur_id,
+          formateur:formateurs ( id, nom ),
           logigramme:logigrammes (
             id,
             filiere:filieres ( code, name ),
@@ -86,13 +88,15 @@ export async function runExamReminderCheck() {
       const classe = cell.unite?.logigramme?.classe;
       const uniteName = cell.unite?.nom || 'Unité inconnue';
       const weekDate = cell.week_start_date;
+      const formateurNom = cell.unite?.formateur?.nom || null;
 
       const contextLabel = [
         filiere ? `${filiere.code} – ${filiere.name}` : null,
         classe ? classe.label : null,
       ].filter(Boolean).join(' / ');
 
-      const message = `Examen à venir (semaine du ${weekDate}) — ${uniteName}${contextLabel ? ` [${contextLabel}]` : ''} — non encore validé.`;
+      const formateurLabel = formateurNom ? ` — ${formateurNom}` : '';
+      const message = `EXAMEN à venir (semaine du ${weekDate}) — ${uniteName}${contextLabel ? ` [${contextLabel}]` : ''}${formateurLabel}`;
 
       return {
         type: 'exam_reminder',

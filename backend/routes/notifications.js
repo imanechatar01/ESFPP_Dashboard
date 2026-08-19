@@ -7,12 +7,35 @@ import { supabaseAdmin } from '../lib/supabase.js';
 const router = express.Router();
 
 // GET /api/notifications
-// Returns the 20 most recent notifications (read + unread) for the bell dropdown.
+// Returns the 20 most recent notifications with target exam context (logigramme_id, unite_id, week_start_date)
 router.get('/', async (_req, res) => {
   try {
     const { data, error } = await supabaseAdmin
       .from('admin_notifications')
-      .select('id, type, message, is_read, created_at, exam_cell_id')
+      .select(`
+        id, 
+        type, 
+        message, 
+        is_read, 
+        created_at, 
+        exam_cell_id,
+        exam_cell:week_cells (
+          id,
+          semaine,
+          week_start_date,
+          unite_id,
+          unite:unites_formation (
+            id,
+            nom,
+            logigramme_id,
+            formateur_id,
+            formateur:formateurs (
+              id,
+              nom
+            )
+          )
+        )
+      `)
       .order('created_at', { ascending: false })
       .limit(20);
 

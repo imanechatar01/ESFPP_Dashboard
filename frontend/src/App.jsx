@@ -30,10 +30,10 @@ function usePath() {
   }, [])
 
   const navigate = useCallback((nextPath, options = {}) => {
-    if (window.location.pathname === nextPath) return
+    const targetUrl = new URL(nextPath, window.location.origin)
     const method = options.replace ? "replaceState" : "pushState"
     window.history[method](null, "", nextPath)
-    setPath(nextPath)
+    setPath(targetUrl.pathname)
   }, [])
 
   return { path, navigate }
