@@ -1,5 +1,9 @@
 {
   "devDependencies": {
     "supabase": "^2.109.1"
+  },
+  "dependencies": {
+    "express-rate-limit": "^8.6.2",
+    "react-router-dom": "^7.18.2"
   }
 }

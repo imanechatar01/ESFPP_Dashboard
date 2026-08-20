@@ -5,6 +5,7 @@ import cors from "cors"
 import { supabase, supabaseAdmin } from "./lib/supabase.js"
 import { requireAuth, requireRole, requireServiceRole, getRole } from "./lib/auth.js"
 
+
 // Routes
 import logigrammesRouter from "./routes/logigrammes.js"
 import completionRouter from "./routes/completion.js"
@@ -18,6 +19,10 @@ import examsRouter from "./routes/exams.js"
 import notificationsRouter from "./routes/notifications.js"
 import { startExamReminderScheduler } from "./lib/exam-reminder-scheduler.js"
 import { initWsBroadcaster } from "./lib/ws-broadcaster.js"
+
+import authRoutes from './routes/auth.js';
+
+
 
 dotenv.config()
 
@@ -366,6 +371,7 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: "Internal server error" })
 })
 
+app.use('/api/auth', authRoutes);
 const httpServer = createServer(app);
 
 // Attach WebSocket broadcaster (real-time admin notifications)

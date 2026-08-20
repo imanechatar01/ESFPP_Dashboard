@@ -19,7 +19,8 @@ import { ControlsManagement } from './pages/controls-management' // ✅ AJOUTER 
 import { ExamsManagement } from "@/pages/exams-management"
 import { StudentExam } from "@/pages/student-exam"
 import { ExamResults } from "@/pages/exam-results"
-
+import { ForgotPassword } from './pages/forgot-password';
+import { ResetPassword } from './pages/reset-password';
 function usePath() {
   const [path, setPath] = useState(() => window.location.pathname)
 
@@ -58,8 +59,16 @@ function LoginPage({ navigate }) {
   )
 }
 
+
 function AppRoutes() {
   const { path, navigate } = usePath()
+  if (path === "/forgot-password") {
+    return <ForgotPassword navigate={navigate} />;
+  }
+
+  if (path === "/reset-password") {
+  return <ResetPassword navigate={navigate} />;  // ✅ Passer navigate en props
+}
 
   if (path === "/" || path === "/login") {
     return <LoginPage navigate={navigate} />
@@ -114,6 +123,7 @@ function DashboardRedirect({ navigate }) {
 
   return <LoadingScreen />
 }
+
 
 export default function App() {
   return (
