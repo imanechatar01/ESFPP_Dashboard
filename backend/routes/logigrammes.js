@@ -1163,10 +1163,11 @@ router.post('/import', importLimiter, upload.single('file'), async (req, res) =>
 
       if (existingUnitsError) throw existingUnitsError;
       if ((existingUnits || []).length > 0 && !replaceSchedule && !allowMerge) {
-        throw new Error(
-          `Des données existent déjà pour "${filiereName} / ${metadata.classe}". ` +
-          'Envoyez replace_schedule=true pour remplacer le planning, ou allow_merge=true pour fusionner explicitement.'
-        );
+        const conflictError = new Error("SCHEDULE_CONFLICT");
+        conflictError.code = "SCHEDULE_CONFLICT";
+        conflictError.filiere = filiereName;
+        conflictError.classe = metadata.classe;
+        throw conflictError;
       }
 
       if ((existingUnits || []).length > 0 && replaceSchedule) {
@@ -1289,6 +1290,14 @@ router.post('/import', importLimiter, upload.single('file'), async (req, res) =>
 
   } catch (err) {
     console.error('Import error:', err);
+    if (err.code === "SCHEDULE_CONFLICT") {
+      return res.status(409).json({
+        error: "SCHEDULE_CONFLICT",
+        code: err.code,
+        filiere: err.filiere,
+        classe: err.classe
+      });
+    }
     res.status(500).json({ error: err.message });
   } finally {
     // Always clean up uploaded file — safeUnlink validates path stays inside uploadDir
