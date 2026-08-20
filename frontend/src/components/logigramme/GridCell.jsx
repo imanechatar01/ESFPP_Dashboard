@@ -2,7 +2,7 @@ import { Check } from 'lucide-react';
 import { getCellClassName } from '@/lib/logigramme-helpers';
 import { cn } from '@/lib/utils';
 
-export function GridCell({ cell, semaine, onToggle, onContextMenu, isHighlighted = false }) {
+export function GridCell({ cell, semaine, onToggle, onContextMenu, isHighlighted = false, isExamHighlight = false }) {
   const isExistingNormal = cell && cell.cell_type === 'normal';
   const displayHeures = isExistingNormal && cell.heures !== null && cell.heures !== undefined
     ? Number(cell.heures)
@@ -22,7 +22,8 @@ export function GridCell({ cell, semaine, onToggle, onContextMenu, isHighlighted
     return (
       <div
         className={cn(
-          "w-10 h-12 border-r border-b border-slate-300 bg-white"
+          "w-10 h-12 border-r border-b border-slate-300 bg-white",
+          isExamHighlight && "ring-4 ring-accent ring-inset z-20 animate-pulse bg-accent/10"
         )}
         onContextMenu={handleContextMenu}
       />
@@ -46,7 +47,8 @@ export function GridCell({ cell, semaine, onToggle, onContextMenu, isHighlighted
       onContextMenu={handleContextMenu}
       className={cn(
         getCellClassName(cell_type, completion_status),
-        isHighlighted && "ring-2 ring-destructive ring-inset z-20 shadow-[0_0_8px_rgba(239,68,68,0.4)]"
+        isHighlighted && "ring-2 ring-destructive ring-inset z-20 shadow-[0_0_8px_rgba(239,68,68,0.4)]",
+        isExamHighlight && "ring-4 ring-accent ring-inset z-20 animate-pulse"
       )}
       title={isHighlighted ? "CONFLIT D'HORAIRE ! " + (isNormal ? `${displayHeuresLabel}h` : cell_type) : (isNormal ? `${displayHeuresLabel}h - ${completion_status}` : cell_type)}
     >

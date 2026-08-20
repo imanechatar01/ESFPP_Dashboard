@@ -9,11 +9,12 @@ import { LogigrammeGrid } from "@/components/logigramme/LogigrammeGrid"
 import { useLogigrammeContext } from "@/contexts/logigramme-context"
 import { useLogigramme } from "@/hooks/useLogigramme"
 import { apiRequest } from "@/lib/api"
-import { CalendarDays, FileSpreadsheet, Loader2, AlertCircle, LayoutGrid, Upload, Pencil, PanelLeftClose, PanelLeftOpen, Activity, Printer } from "lucide-react"
+import { CalendarDays, FileSpreadsheet, Loader2, AlertCircle, LayoutGrid, Upload, Pencil, PanelLeftClose, PanelLeftOpen, Activity, Printer, Copy } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { ImportModal } from "@/components/logigramme/ImportModal"
 import { EditLogigrammeModal } from "@/components/logigramme/EditLogigrammeModal"
+import { DuplicateYearModal } from "@/components/logigramme/DuplicateYearModal"
 
 const navItems = [
   { label: "Tableau de bord", path: "/admin/dashboard", icon: LayoutGrid },
@@ -22,13 +23,20 @@ const navItems = [
 ]
 
 export function LogigrammeView({ path, navigate }) {
-  const { filters } = useLogigrammeContext()
+  const { filters, highlightLogigrammeId } = useLogigrammeContext()
   const [list, setList] = useState([])
   const [loadingList, setLoadingList] = useState(false)
   const [activeLogId, setActiveLogId] = useState(null)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+
+  useEffect(() => {
+    if (highlightLogigrammeId) {
+      setActiveLogId(highlightLogigrammeId)
+    }
+  }, [highlightLogigrammeId])
 
   const {
     data: activeLog,
@@ -166,6 +174,16 @@ export function LogigrammeView({ path, navigate }) {
             </Button>
           )}
 
+          <Button
+            variant="outline"
+            onClick={() => setIsDuplicateModalOpen(true)}
+            className="rounded-xl font-bold uppercase tracking-widest text-[10px] h-[34px] px-3 flex-1 sm:flex-initial border-primary/30 text-primary hover:bg-primary/5"
+            title="Dupliquer tous les logigrammes vers une autre année"
+          >
+            <Copy className="size-3.5 mr-1.5" />
+            Dupliquer →
+          </Button>
+
           {filters.formateur_id && (
             <Button
               onClick={() => window.print()}
@@ -293,6 +311,13 @@ export function LogigrammeView({ path, navigate }) {
         logigrammeData={activeLog}
         onSaveSuccess={() => {
           refreshGrid()
+          fetchList()
+        }}
+      />
+      <DuplicateYearModal
+        isOpen={isDuplicateModalOpen}
+        onClose={() => setIsDuplicateModalOpen(false)}
+        onSuccess={() => {
           fetchList()
         }}
       />

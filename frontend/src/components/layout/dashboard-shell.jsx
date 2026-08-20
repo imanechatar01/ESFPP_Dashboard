@@ -21,14 +21,22 @@ import {
   ChevronDown,
   FileSpreadsheet,
   ClipboardCheck,
-  Award
+  Award,
+  CheckCheck,
+  Trash2,
+  ClipboardList,
+  BellRing
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
+import { useNotifications } from "@/hooks/useNotifications"
+import { useLogigrammeContext } from "@/contexts/logigramme-context"
 
 export function DashboardShell({ title, subtitle, navItems, activePath, navigate, accent = "admin", children }) {
   const { user, role, signOut } = useAuth()
+  const logContext = useLogigrammeContext()
+  const { setFilter, setHighlightUniteId, setHighlightWeek, setHighlightCellId, setHighlightLogigrammeId } = logContext || {}
 
   // isPinned = sidebar locked open by a deliberate click (persisted)
   // isHoverOpen = sidebar temporarily open by a 3-second hover preview (ephemeral)
@@ -46,10 +54,17 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
 
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const [isBellOpen, setIsBellOpen] = useState(false)
+  const [showClearConfirm, setShowClearConfirm] = useState(false)
   const dropdownRef = useRef(null)
+  const bellRef = useRef(null)
 
   const userRole = role || (accent === "student" ? "student" : "admin")
   const isStudent = userRole === "student"
+  const isAdmin = !isStudent
+
+  // Notifications — only loaded for admins
+  const { notifications, unreadCount, markAllRead, markRead, clearAll } = useNotifications()
 
   // Utiliser navItems passé en props, sinon utiliser les items par défaut
   const defaultNavItems = isStudent
@@ -117,6 +132,9 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
     function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsProfileOpen(false)
+      }
+      if (bellRef.current && !bellRef.current.contains(event.target)) {
+        setIsBellOpen(false)
       }
     }
     document.addEventListener("mousedown", handleClickOutside)
@@ -293,10 +311,188 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
             </div>
 
             <div className="flex items-center gap-3">
-              <button className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-colors relative cursor-pointer">
-                <Bell className="size-4" />
-                <span className="absolute top-2 right-2 size-2 bg-accent rounded-full ring-2 ring-white" />
-              </button>
+              {/* Bell — only shown to admin, wired to real notifications */}
+              {isAdmin && (
+                <div className="relative" ref={bellRef}>
+                  <button
+                    type="button"
+                    id="notifications-bell-btn"
+                    aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} non lues)` : ''}`}
+                    onClick={() => {
+                      const opening = !isBellOpen
+                      setIsBellOpen(opening)
+                      if (!opening) setShowClearConfirm(false)
+                    }}
+                    className="p-2 rounded-xl text-slate-400 hover:text-primary hover:bg-primary/8 border border-transparent hover:border-primary/15 transition-all relative cursor-pointer"
+                  >
+                    {unreadCount > 0 ? <BellRing className="size-4 text-primary animate-bounce-short" /> : <Bell className="size-4" />}
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-0.5 bg-destructive rounded-full ring-2 ring-white flex items-center justify-center text-[8px] font-black text-white leading-none">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
+                  </button>
+
+                  {isBellOpen && (
+                    <div
+                      id="notifications-dropdown"
+                      className="absolute right-0 top-full mt-2 w-96 rounded-2xl border border-border/50 bg-white/95 shadow-2xl shadow-primary/12 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+                      style={{ backdropFilter: 'blur(16px)' }}
+                    >
+                      {/* Header */}
+                      <div className="px-4 py-3 border-b border-border/50 bg-gradient-to-r from-primary/5 to-secondary/10">
+                        <div className="flex items-center justify-between mb-2.5">
+                          <div className="flex items-center gap-2">
+                            <div className="p-1 rounded-lg bg-primary/10">
+                              <Bell className="size-3.5 text-primary" />
+                            </div>
+                            <p className="text-[11px] font-black uppercase tracking-widest text-primary">Notifications</p>
+                            {unreadCount > 0 && (
+                              <span className="px-1.5 py-0.5 bg-destructive text-white text-[8px] font-black rounded-full">
+                                {unreadCount} non lue{unreadCount > 1 ? 's' : ''}
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => { setIsBellOpen(false); setShowClearConfirm(false); }}
+                            className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+                          >
+                            <X className="size-3" />
+                          </button>
+                        </div>
+                        {/* Action buttons */}
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={unreadCount === 0}
+                            onClick={markAllRead}
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-bold text-primary bg-primary/8 hover:bg-primary/15 border border-primary/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                          >
+                            <CheckCheck className="size-3" />
+                            Tout marquer lu
+                          </button>
+                          <button
+                            type="button"
+                            disabled={notifications.length === 0}
+                            onClick={() => setShowClearConfirm(true)}
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-bold text-destructive bg-destructive/8 hover:bg-destructive/15 border border-destructive/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                          >
+                            <Trash2 className="size-3" />
+                            Tout effacer
+                          </button>
+                        </div>
+                        {/* Inline confirm */}
+                        {showClearConfirm && (
+                          <div className="mt-2 flex items-center gap-2 p-2 rounded-xl bg-destructive/8 border border-destructive/20 animate-in fade-in slide-in-from-top-1 duration-150">
+                            <p className="text-[9px] font-bold text-destructive flex-1">Supprimer définitivement toutes les notifications ?</p>
+                            <button
+                              type="button"
+                              onClick={async () => { await clearAll(); setShowClearConfirm(false); setIsBellOpen(false); }}
+                              className="px-2 py-0.5 rounded-md bg-destructive text-white text-[9px] font-black hover:bg-destructive/90 transition-colors cursor-pointer"
+                            >Confirmer</button>
+                            <button
+                              type="button"
+                              onClick={() => setShowClearConfirm(false)}
+                              className="px-2 py-0.5 rounded-md bg-muted text-muted-foreground text-[9px] font-black hover:bg-muted/80 transition-colors cursor-pointer"
+                            >Annuler</button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Notification list */}
+                      <div className="max-h-80 overflow-y-auto divide-y divide-border/30">
+                        {notifications.length === 0 ? (
+                          <div className="px-4 py-10 text-center">
+                            <div className="size-12 rounded-2xl bg-muted/60 flex items-center justify-center mx-auto mb-3">
+                              <Bell className="size-5 text-muted-foreground/30" />
+                            </div>
+                            <p className="text-[11px] font-bold text-muted-foreground/50 uppercase tracking-wider">Aucune notification</p>
+                            <p className="text-[9px] text-muted-foreground/30 mt-1">Les alertes d'examen apparaîtront ici</p>
+                          </div>
+                        ) : (
+                          notifications.map(notif => (
+                            <button
+                              key={notif.id}
+                              type="button"
+                              onClick={() => {
+                                markRead(notif.id)
+                                setIsBellOpen(false)
+                                if (navigate) {
+                                  const examCell = notif.exam_cell
+                                  if (examCell) {
+                                    const logId = examCell.unite?.logigramme_id
+                                    const uniteId = examCell.unite_id
+                                    const semaine = examCell.semaine
+                                    const cellId = examCell.id
+                                    const formateurId = examCell.unite?.formateur_id
+
+                                    if (setHighlightLogigrammeId) setHighlightLogigrammeId(logId || null)
+                                    if (setHighlightUniteId) setHighlightUniteId(uniteId || null)
+                                    if (setHighlightWeek) setHighlightWeek(semaine || null)
+                                    if (setHighlightCellId) setHighlightCellId(cellId || null)
+
+                                    if (setFilter) {
+                                      // If formateur_id is present, we can filter by it
+                                      if (formateurId) {
+                                        setFilter('formateur_id', formateurId)
+                                      } else {
+                                        setFilter('formateur_id', null)
+                                      }
+                                    }
+
+                                    const targetPath = isAdmin ? '/admin/logigrammes' : '/student/logigrammes'
+                                    navigate(targetPath)
+                                  } else {
+                                    navigate(isAdmin ? '/admin/logigrammes' : '/student/logigrammes')
+                                  }
+                                }
+                              }}
+                              className={cn(
+                                "w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-muted/30 transition-colors group cursor-pointer",
+                                !notif.is_read && "bg-primary/4"
+                              )}
+                            >
+                              {/* Icon */}
+                              <div className={cn(
+                                "mt-0.5 shrink-0 p-1.5 rounded-lg transition-colors",
+                                !notif.is_read ? "bg-primary/12 text-primary" : "bg-muted/60 text-muted-foreground"
+                              )}>
+                                <ClipboardList className="size-3" />
+                              </div>
+
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between gap-2">
+                                  <p className={cn(
+                                    "text-[10px] leading-snug line-clamp-2",
+                                    !notif.is_read ? "font-bold text-slate-800" : "font-medium text-muted-foreground"
+                                  )}>{notif.message}</p>
+                                  {/* Unread dot */}
+                                  {!notif.is_read && (
+                                    <span className="mt-1 shrink-0 size-1.5 rounded-full bg-primary" />
+                                  )}
+                                </div>
+                                <p className="text-[9px] text-muted-foreground/60 mt-1 font-medium">
+                                  {formatRelativeTime(notif.created_at)}
+                                </p>
+                              </div>
+                            </button>
+                          ))
+                        )}
+                      </div>
+
+                      {/* Footer */}
+                      {notifications.length > 0 && (
+                        <div className="px-4 py-2 border-t border-border/40 bg-muted/20">
+                          <p className="text-[9px] text-muted-foreground/50 text-center">
+                            {notifications.length} notification{notifications.length > 1 ? 's' : ''} · Mis à jour en temps réel
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="h-6 w-px bg-slate-200 mx-1.5" />
 
@@ -357,4 +553,13 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
       </div>
     </main>
   )
+}
+
+function formatRelativeTime(dateStr) {
+  if (!dateStr) return '';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  if (diff < 60_000) return "À l'instant";
+  if (diff < 3_600_000) return `Il y a ${Math.floor(diff / 60_000)} min`;
+  if (diff < 86_400_000) return `Il y a ${Math.floor(diff / 3_600_000)} h`;
+  return new Date(dateStr).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
 }

@@ -17,13 +17,17 @@ export function ImportModal({ isOpen, onClose, onImportSuccess }) {
   const [loadingYears, setLoadingYears] = useState(false)
   const [importing, setImporting] = useState(false)
   const [error, setError] = useState(null)
+  const [conflict, setConflict] = useState(null)
   const [successData, setSuccessData] = useState(null)
+  const [confirmReplace, setConfirmReplace] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
       fetchAcademicYears()
       setFile(null)
       setError(null)
+      setConflict(null)
+      setConfirmReplace(false)
       setSuccessData(null)
     }
   }, [isOpen])
@@ -69,6 +73,8 @@ export function ImportModal({ isOpen, onClose, onImportSuccess }) {
       if (droppedFile.name.endsWith(".xls")) {
         setFile(droppedFile)
         setError(null)
+        setConflict(null)
+        setConfirmReplace(false)
       } else {
         setError("Seuls les fichiers Excel au format .xls sont supportés.")
       }
@@ -81,13 +87,15 @@ export function ImportModal({ isOpen, onClose, onImportSuccess }) {
       if (selectedFile.name.endsWith(".xls")) {
         setFile(selectedFile)
         setError(null)
+        setConflict(null)
+        setConfirmReplace(false)
       } else {
         setError("Seuls les fichiers Excel au format .xls sont supportés.")
       }
     }
   }
 
-  const handleUpload = async () => {
+  const handleUpload = async (flags = {}) => {
     if (!selectedYearId) {
       setError("Veuillez sélectionner une année académique.")
       return
@@ -99,6 +107,8 @@ export function ImportModal({ isOpen, onClose, onImportSuccess }) {
 
     setImporting(true)
     setError(null)
+    setConflict(null)
+    setConfirmReplace(false)
     setSuccessData(null)
 
     try {
@@ -108,6 +118,9 @@ export function ImportModal({ isOpen, onClose, onImportSuccess }) {
       const formData = new FormData()
       formData.append("academic_year_id", selectedYearId)
       formData.append("file", file)
+      
+      if (flags.replace_schedule) formData.append("replace_schedule", "true")
+      if (flags.allow_merge) formData.append("allow_merge", "true")
 
       const response = await fetch(`${API_URL}/api/logigramme/import`, {
         method: "POST",
@@ -118,6 +131,10 @@ export function ImportModal({ isOpen, onClose, onImportSuccess }) {
       const payload = await response.json().catch(() => ({}))
 
       if (!response.ok) {
+        if (payload.error === "SCHEDULE_CONFLICT") {
+          setConflict(payload)
+          return
+        }
         throw new Error(payload.error || "L'importation a échoué.")
       }
 
@@ -159,7 +176,90 @@ export function ImportModal({ isOpen, onClose, onImportSuccess }) {
         </div>
 
         {/* Content */}
-        {!successData ? (
+        {conflict ? (
+          <div className="space-y-5 animate-in slide-in-from-right-4 duration-200">
+            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex flex-col items-center text-center gap-3">
+              <div className="size-12 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-600">
+                <AlertCircle className="size-6" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-amber-900">
+                  Un planning existe déjà
+                </h4>
+                <p className="text-xs font-semibold text-amber-800 mt-1">
+                  {conflict.filiere} / {conflict.classe}
+                </p>
+                <p className="text-[11px] font-medium text-amber-700/80 mt-2">
+                  Des unités de formation sont déjà enregistrées pour cette classe. Que souhaitez-vous faire des nouvelles données du fichier ?
+                </p>
+              </div>
+            </div>
+
+            {confirmReplace ? (
+              <div className="p-4 rounded-xl border border-destructive/30 bg-destructive/5 space-y-3 animate-in fade-in zoom-in-95">
+                <p className="text-xs font-bold text-destructive text-center">
+                  ⚠️ Cette action est irréversible et supprimera toutes les données actuelles de cette classe avant d'importer les nouvelles.
+                </p>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline"
+                    onClick={() => setConfirmReplace(false)}
+                    className="flex-1 rounded-xl text-[10px] font-bold uppercase tracking-widest border-destructive/20 hover:bg-destructive/10 text-destructive"
+                    disabled={importing}
+                  >
+                    Retour
+                  </Button>
+                  <Button 
+                    onClick={() => handleUpload({ replace_schedule: true })}
+                    className="flex-1 rounded-xl text-[10px] font-bold uppercase tracking-widest bg-destructive hover:bg-destructive/90 text-white"
+                    disabled={importing}
+                  >
+                    {importing ? <Loader2 className="size-3.5 animate-spin" /> : "Confirmer le remplacement"}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <button
+                  onClick={() => handleUpload({ allow_merge: true })}
+                  disabled={importing}
+                  className="w-full text-left p-4 rounded-xl border border-border hover:border-primary/50 hover:bg-primary/5 transition-all group cursor-pointer"
+                >
+                  <p className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">
+                    Fusionner avec l'existant
+                  </p>
+                  <p className="text-[11px] font-medium text-muted-foreground mt-1">
+                    Ajoute ou met à jour uniquement les semaines correspondantes. Ne supprime aucune donnée existante.
+                  </p>
+                </button>
+                
+                <button
+                  onClick={() => setConfirmReplace(true)}
+                  disabled={importing}
+                  className="w-full text-left p-4 rounded-xl border border-border hover:border-destructive/50 hover:bg-destructive/5 transition-all group cursor-pointer"
+                >
+                  <p className="text-sm font-bold text-foreground group-hover:text-destructive transition-colors">
+                    Remplacer le planning existant
+                  </p>
+                  <p className="text-[11px] font-medium text-muted-foreground mt-1">
+                    Écrase la totalité du planning actuel pour cette classe avec les données du fichier.
+                  </p>
+                </button>
+              </div>
+            )}
+
+            {!confirmReplace && (
+              <Button 
+                variant="outline" 
+                onClick={() => { setConflict(null); setError(null); }} 
+                className="w-full rounded-xl font-bold uppercase tracking-widest text-[10px]"
+                disabled={importing}
+              >
+                Annuler
+              </Button>
+            )}
+          </div>
+        ) : !successData ? (
           <div className="space-y-4">
             
             {/* Year selector */}

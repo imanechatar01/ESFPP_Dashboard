@@ -295,12 +295,15 @@ function LegendItem({ color, label }) {
 
 function getCellColor(cell) {
   if (!cell) return 'transparent';
+  const isDone = cell.completion_status === 'done' || cell.completion_status === 'auto_done';
   switch (cell.cell_type) {
     case 'vacation':  return '#F472B6';
-    case 'exam':      return '#e2e8f0';
+    case 'exam':
+      // Pending = slightly darker soft red; Done = deep teal-green (distinct from normal done mint)
+      return isDone ? '#134e3a' : '#fca5a5';
     case 'tiff':      return '#facc15';
     case 'normal':
-      if (cell.completion_status === 'done' || cell.completion_status === 'auto_done') {
+      if (isDone) {
         return '#BBF7D0';
       }
       return '#FEF9C3';

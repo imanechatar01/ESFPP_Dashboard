@@ -97,11 +97,11 @@ router.post('/replace', async (req, res) => {
 // GET /api/formateurs/:id/unites
 router.get('/:id/unites', async (req, res) => {
   const { id } = req.params;
-  const { filiere_id, classe_id, niveau_id } = req.query;
+  const { filiere_id, classe_id, niveau_id, year_id } = req.query;
 
   try {
     // 1. Get all units for this formateur
-    const { data: units, error: unitsError } = await supabaseAdmin
+    let unitQuery = supabaseAdmin
       .from('unites_formation')
       .select(`
         id,
@@ -115,6 +115,7 @@ router.get('/:id/unites', async (req, res) => {
           id,
           filiere_id,
           classe_id,
+          academic_year_id,
           filiere:filieres (code, name, niveau),
           classe:classes (label, annee)
         ),
@@ -130,6 +131,8 @@ router.get('/:id/unites', async (req, res) => {
       .eq('formateur_id', id)
       .order('logigramme_id');
 
+    const { data: units, error: unitsError } = await unitQuery;
+
     if (unitsError) throw unitsError;
 
     // Debug: Log what we actually got
@@ -140,8 +143,16 @@ router.get('/:id/unites', async (req, res) => {
     // Apply client-side filtering based on query parameters
     let filteredUnits = units;
     
-    console.log('[FormateursAPI] Filtering with params:', { filiere_id, classe_id, niveau_id });
+    console.log('[FormateursAPI] Filtering with params:', { year_id, filiere_id, classe_id, niveau_id });
     console.log('[FormateursAPI] Total units before filter:', units.length);
+
+    // Filter by academic year (most important — keeps KPI and FormateurVue in sync)
+    if (year_id) {
+      filteredUnits = filteredUnits.filter(u =>
+        String(u.logigramme?.academic_year_id) === String(year_id)
+      );
+      console.log('[FormateursAPI] After year filter:', filteredUnits.length);
+    }
 
     if (niveau_id) {
       filteredUnits = filteredUnits.filter(u => {
@@ -179,10 +190,10 @@ router.get('/:id/unites', async (req, res) => {
     const processedUnits = filteredUnits.map(u => {
       const processedCells = u.cells.map(c => {
         let status = c.completion?.status || 'pending';
-        if (status === 'pending') {
-          if (c.week_start_date && c.week_start_date < today) {
-            status = 'auto_done';
-          }
+        // Only auto-done if there is NO explicit completion row in the DB.
+        // If the admin explicitly set status to 'pending' (un-toggle), respect it.
+        if (!c.completion && c.week_start_date && c.week_start_date < today) {
+          status = 'auto_done';
         }
         return {
           ...c,

@@ -1,4 +1,5 @@
 import express from "express"
+import { createServer } from "http"
 import dotenv from "dotenv"
 import cors from "cors"
 import { supabase, supabaseAdmin } from "./lib/supabase.js"
@@ -15,6 +16,9 @@ import yearsRouter from "./routes/academic-years.js"
 import coursesRouter from "./routes/courses.js"
 import dashboardRouter from "./routes/dashboard.js"
 import examsRouter from "./routes/exams.js"
+import notificationsRouter from "./routes/notifications.js"
+import { startExamReminderScheduler } from "./lib/exam-reminder-scheduler.js"
+import { initWsBroadcaster } from "./lib/ws-broadcaster.js"
 
 import authRoutes from './routes/auth.js';
 
@@ -65,6 +69,7 @@ app.use("/api/formateurs", requireAuth, requireRole("admin"), formateursRouter);
 app.use("/api/years", requireAuth, requireRole("admin"), yearsRouter);
 app.use("/api/courses", requireAuth, coursesRouter);
 app.use("/api/exams", requireServiceRole, requireAuth, examsRouter);
+app.use("/api/notifications", requireAuth, requireRole("admin"), notificationsRouter);
 
 // ---------------------------------------------------------------------------
 // Student — Read-only Logigramme
@@ -367,13 +372,19 @@ app.use((err, _req, res, _next) => {
 })
 
 app.use('/api/auth', authRoutes);
-const server = app.listen(PORT);
+const httpServer = createServer(app);
 
-server.on('listening', () => {
+// Attach WebSocket broadcaster (real-time admin notifications)
+initWsBroadcaster(httpServer);
+
+httpServer.listen(PORT, () => {
   console.log(`Backend started on http://localhost:${PORT}`);
+  // Start the exam-reminder scheduler after the server is ready.
+  // Runs once 5 s after boot, then every 24 h.
+  startExamReminderScheduler();
 });
 
-server.on('error', (err) => {
+httpServer.on('error', (err) => {
   console.error(`Failed to start server:`, err);
   process.exit(1);
 });

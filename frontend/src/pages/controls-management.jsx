@@ -358,7 +358,19 @@ export function ControlsManagement({ path, navigate }) {
   // Filtres
   const [filterFiliere, setFilterFiliere] = useState('all') // ✅ Changé de filterClasse à filterFiliere
   const [filterStatus, setFilterStatus] = useState('all')
-  const [searchTerm, setSearchTerm] = useState('')
+  const [searchTerm, setSearchTerm] = useState(() => {
+    const params = new URLSearchParams(window.location.search)
+    return params.get('search') || ''
+  })
+
+  // Synchroniser la recherche si l'URL change
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const urlSearch = params.get('search')
+    if (urlSearch !== null) {
+      setSearchTerm(urlSearch)
+    }
+  }, [path])
 
   // Charger les logigrammes
   const loadLogigrammes = useCallback(async () => {
@@ -372,7 +384,7 @@ export function ControlsManagement({ path, navigate }) {
 
   useEffect(() => {
     loadLogigrammes()
-  }, [])
+  }, [loadLogigrammes])
 
   // Charger tous les contrôles
   const loadControles = useCallback(async () => {
