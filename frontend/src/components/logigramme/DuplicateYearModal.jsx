@@ -27,9 +27,12 @@ export function DuplicateYearModal({ isOpen, onClose, onSuccess }) {
   const [loadingYears, setLoadingYears] = useState(false);
   const [sourceYearId, setSourceYearId] = useState('');
   const [targetValue, setTargetValue] = useState(''); // UUID or "NEW:2027-2028"
-  const [step, setStep] = useState('select'); // 'select' | 'confirm' | 'loading' | 'success' | 'error'
+  const [step, setStep] = useState('select'); // 'select' | 'select_programs' | 'confirm' | 'loading' | 'success' | 'error'
   const [result, setResult] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
+  const [sourceLogigrammes, setSourceLogigrammes] = useState([]);
+  const [loadingLogigrammes, setLoadingLogigrammes] = useState(false);
+  const [selectedLogigrammeIds, setSelectedLogigrammeIds] = useState([]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -38,6 +41,8 @@ export function DuplicateYearModal({ isOpen, onClose, onSuccess }) {
     setTargetValue('');
     setResult(null);
     setErrorMsg('');
+    setSourceLogigrammes([]);
+    setSelectedLogigrammeIds([]);
     loadYears();
   }, [isOpen]);
 
@@ -83,12 +88,73 @@ export function DuplicateYearModal({ isOpen, onClose, onSuccess }) {
 
   const canConfirm = sourceYearId && targetValue && (isTargetNew || targetValue !== sourceYearId);
 
+  async function handleGoToSelectPrograms() {
+    setLoadingLogigrammes(true);
+    setStep('select_programs');
+    try {
+      const data = await apiRequest(`/api/logigramme/list?year_id=${sourceYearId}`);
+      setSourceLogigrammes(data || []);
+      setSelectedLogigrammeIds((data || []).map(l => l.id));
+    } catch (err) {
+      setErrorMsg(err.message || 'Erreur lors du chargement des programmes.');
+      setStep('error');
+    } finally {
+      setLoadingLogigrammes(false);
+    }
+  }
+
+  const groupedLogigrammes = useMemo(() => {
+    const groups = {};
+    sourceLogigrammes.forEach(log => {
+      const fId = log.filiere?.id;
+      if (!fId) return;
+      if (!groups[fId]) {
+        groups[fId] = {
+          filiere: log.filiere,
+          logigrammes: []
+        };
+      }
+      groups[fId].logigrammes.push(log);
+    });
+    Object.values(groups).forEach(g => {
+      g.logigrammes.sort((a, b) => (a.classe?.annee || 0) - (b.classe?.annee || 0));
+    });
+    return Object.values(groups).sort((a, b) => a.filiere.name.localeCompare(b.filiere.name));
+  }, [sourceLogigrammes]);
+
+  const toggleLogigramme = (id) => {
+    setSelectedLogigrammeIds(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleFiliere = (fId) => {
+    const group = groupedLogigrammes.find(g => g.filiere.id === fId);
+    if (!group) return;
+    const logIds = group.logigrammes.map(l => l.id);
+    const allSelected = logIds.every(id => selectedLogigrammeIds.includes(id));
+    
+    if (allSelected) {
+      setSelectedLogigrammeIds(prev => prev.filter(id => !logIds.includes(id)));
+    } else {
+      setSelectedLogigrammeIds(prev => {
+        const newIds = new Set(prev);
+        logIds.forEach(id => newIds.add(id));
+        return Array.from(newIds);
+      });
+    }
+  };
+
+  const selectAll = () => setSelectedLogigrammeIds(sourceLogigrammes.map(l => l.id));
+  const deselectAll = () => setSelectedLogigrammeIds([]);
+
   async function handleDuplicate() {
     setStep('loading');
     setErrorMsg('');
     try {
       const payload = {
         source_year_id: sourceYearId,
+        logigramme_ids: selectedLogigrammeIds,
       };
       if (isTargetNew) {
         payload.target_year_label = targetLabel;
@@ -258,13 +324,103 @@ export function DuplicateYearModal({ isOpen, onClose, onSuccess }) {
                   Annuler
                 </Button>
                 <Button
-                  onClick={() => setStep('confirm')}
+                  onClick={handleGoToSelectPrograms}
                   disabled={!canConfirm}
                   className="flex-1 rounded-xl font-bold uppercase tracking-widest text-[10px]"
                 >
                   Continuer
                 </Button>
               </div>
+            </div>
+          )}
+
+          {/* ── STEP: select_programs ── */}
+          {step === 'select_programs' && (
+            <div className="space-y-5">
+              {loadingLogigrammes ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="size-6 animate-spin text-primary/40" />
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
+                      Sélection des programmes ({selectedLogigrammeIds.length} sur {sourceLogigrammes.length})
+                    </p>
+                    <div className="flex gap-2">
+                      <button onClick={selectAll} className="text-[10px] font-bold text-primary hover:underline cursor-pointer">
+                        Tout sélectionner
+                      </button>
+                      <span className="text-muted-foreground/30">•</span>
+                      <button onClick={deselectAll} className="text-[10px] font-bold text-muted-foreground hover:underline cursor-pointer">
+                        Tout désélectionner
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="max-h-[300px] overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+                    {groupedLogigrammes.map(group => {
+                      const logIds = group.logigrammes.map(l => l.id);
+                      const allSelected = logIds.every(id => selectedLogigrammeIds.includes(id));
+                      const someSelected = logIds.some(id => selectedLogigrammeIds.includes(id));
+                      
+                      return (
+                        <div key={group.filiere.id} className="border border-border rounded-xl overflow-hidden bg-background">
+                          <div className="flex items-center gap-3 p-3 bg-muted/30 border-b border-border">
+                            <input
+                              type="checkbox"
+                              checked={allSelected}
+                              ref={el => { if (el) el.indeterminate = someSelected && !allSelected; }}
+                              onChange={() => toggleFiliere(group.filiere.id)}
+                              className="size-4 rounded border-border text-primary focus:ring-primary/20 cursor-pointer"
+                            />
+                            <span className="text-xs font-black text-foreground">
+                              {group.filiere.name}
+                            </span>
+                          </div>
+                          <div className="p-2 space-y-1">
+                            {group.logigrammes.map(log => (
+                              <label key={log.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedLogigrammeIds.includes(log.id)}
+                                  onChange={() => toggleLogigramme(log.id)}
+                                  className="size-4 rounded border-border text-primary focus:ring-primary/20 cursor-pointer"
+                                />
+                                <span className="text-xs font-medium text-foreground/80">
+                                  {log.classe?.label || `Année ${log.classe?.annee}`}
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {groupedLogigrammes.length === 0 && (
+                      <div className="text-center py-4 text-xs text-muted-foreground">
+                        Aucun programme trouvé pour l'année source.
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setStep('select')}
+                      className="flex-1 rounded-xl font-bold uppercase tracking-widest text-[10px]"
+                    >
+                      Retour
+                    </Button>
+                    <Button
+                      onClick={() => setStep('confirm')}
+                      disabled={selectedLogigrammeIds.length === 0}
+                      className="flex-1 rounded-xl font-bold uppercase tracking-widest text-[10px]"
+                    >
+                      Continuer
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -304,7 +460,7 @@ export function DuplicateYearModal({ isOpen, onClose, onSuccess }) {
               <div className="flex gap-3 pt-2">
                 <Button
                   variant="outline"
-                  onClick={() => setStep('select')}
+                  onClick={() => setStep('select_programs')}
                   className="flex-1 rounded-xl font-bold uppercase tracking-widest text-[10px]"
                 >
                   Retour

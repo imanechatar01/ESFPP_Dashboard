@@ -438,10 +438,14 @@ router.put('/:id/auto-complete', async (req, res) => {
 // - No completion data is ever copied (auto-mark re-applies based on new dates vs today).
 // - Source year data is NEVER modified.
 router.post('/duplicate-year', async (req, res) => {
-  const { source_year_id, target_year_id, target_year_label } = req.body;
+  const { source_year_id, target_year_id, target_year_label, logigramme_ids } = req.body;
 
   if (!source_year_id || (!target_year_id && !target_year_label)) {
     return res.status(400).json({ error: 'source_year_id et (target_year_id ou target_year_label) sont requis.' });
+  }
+
+  if (logigramme_ids !== undefined && Array.isArray(logigramme_ids) && logigramme_ids.length === 0) {
+    return res.status(400).json({ error: 'Aucun programme sélectionné pour la duplication.' });
   }
 
   try {
@@ -596,10 +600,16 @@ router.post('/duplicate-year', async (req, res) => {
     }
 
     // 4. Fetch all source logigrammes with their units and cells
-    const { data: srcLogigrammes, error: srcLogsError } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('logigrammes')
       .select('id, filiere_id, classe_id, auto_complete')
       .eq('academic_year_id', source_year_id);
+      
+    if (logigramme_ids && Array.isArray(logigramme_ids) && logigramme_ids.length > 0) {
+      query = query.in('id', logigramme_ids);
+    }
+
+    const { data: srcLogigrammes, error: srcLogsError } = await query;
     if (srcLogsError) throw srcLogsError;
 
     if (!srcLogigrammes || srcLogigrammes.length === 0) {
