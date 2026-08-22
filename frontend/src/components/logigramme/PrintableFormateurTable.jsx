@@ -59,6 +59,13 @@ export function PrintableFormateurTable({ formateurNom, unites, weeks, onContext
     w && cellMaps.some((map) => isCellMeaningful(map[w.semaine]))
   );
 
+  // Découpage en chunks de 16 semaines maximum
+  const MAX_WEEKS_PER_CHUNK = 16;
+  const weekChunks = [];
+  for (let i = 0; i < activeWeeks.length; i += MAX_WEEKS_PER_CHUNK) {
+    weekChunks.push(activeWeeks.slice(i, i + MAX_WEEKS_PER_CHUNK));
+  }
+
   // Determine distinct programme labels for the header info line
   const programmeLabels = [...new Set(
     dedupedUnites.map((u) =>
@@ -74,164 +81,163 @@ export function PrintableFormateurTable({ formateurNom, unites, weeks, onContext
   return (
     /* print-only: hidden on screen, shown on print via globals.css */
     <div className="print-only">
-        {/* ── Document Header ──────────────────────────────────────────────── */}
-        <div style={{ marginBottom: '6px', borderBottom: '2px solid #1e3a6e', paddingBottom: '4px' }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '16px' }}>
-            <h1 style={{
-              fontSize: dedupedUnites.length > 15 ? '9pt' : '12pt',
-              fontWeight: 900,
-              textTransform: 'uppercase',
-              letterSpacing: '0.15em',
-              color: '#1e3a6e',
-              margin: 0
-            }}>
-              Plan de Formation
-            </h1>
-            <span style={{ fontSize: dedupedUnites.length > 15 ? '8pt' : '9pt', fontWeight: 700, color: '#374151' }}>
-              Formateur : {formateurNom}
-            </span>
-          </div>
-          <p style={{ fontSize: '6.5pt', color: '#6b7280', marginTop: '2px', marginBottom: 0 }}>
-            {programmeLabels.join('  |  ')} &nbsp;—&nbsp;
-            <strong>{dedupedUnites.length} unités</strong> &nbsp;—&nbsp;
-            <strong>{totalVhg} h VHG total</strong> &nbsp;—&nbsp;
-            <strong>{activeWeeks.length} semaines actives</strong>
-          </p>
-        </div>
-
-        {/* ── Merged Table ─────────────────────────────────────────────────── */}
-        {/* Layout rationale:
-             - Fixed 3 label cols take ~28% of width (Programme + N° + Unité)
-             - Remaining 72% split equally among all active week columns
-             - tableLayout: fixed + width: 100% ensures the table always
-               spans the full printable width, whatever the column count.
-        */}
-        <table style={{
-          width: '100%',
-          borderCollapse: 'collapse',
-          tableLayout: 'fixed',
-          fontSize: `${Math.max(4.5, Math.min(6.5, 200 / Math.max(activeWeeks.length, 10)))}pt`,
-          fontFamily: 'Figtree, ui-sans-serif, system-ui, sans-serif',
-        }}>
-          <colgroup>
-            {/* Programme column — fixed ~10% */}
-            <col style={{ width: '10%' }} />
-            {/* Unité de formation — fixed ~18% (reclaimed 3% from removed N° column) */}
-            <col style={{ width: '18%' }} />
-            {/* NOTE: VHG column removed — Point 2 */}
-            {/* One col per ACTIVE week — remaining 72% split equally */}
-            {activeWeeks.map((w) => (
-              <col key={w?.semaine || Math.random()} style={{ width: `${72 / Math.max(activeWeeks.length, 1)}%` }} />
-            ))}
-          </colgroup>
-
-          <thead>
-            {/* Row 1: Title + Month spans */}
-            <tr>
-              {/* Fixed left columns header cell spanning "Programme / Unité" (2 cols, VHG and N° removed) */}
-              <th
-                colSpan={2}
-                style={{
-                  backgroundColor: '#FFE600',
-                  color: '#000',
+      {weekChunks.map((chunk, chunkIndex) => {
+        // Calcul du fontSize basé sur la taille du chunk : plancher à 7pt, plafond à 9pt
+        const fontSize = `${Math.max(7, Math.min(9, 120 / Math.max(chunk.length, 10)))}pt`;
+        
+        return (
+          <div 
+            key={chunkIndex} 
+            style={{ 
+              // Au lieu de forcer un saut de page avant chaque chunk (qui gaspille de l'espace),
+              // on laisse le flux gérer la pagination et on évite de couper un chunk au milieu.
+              pageBreakInside: 'avoid',
+              breakInside: 'avoid',
+              marginBottom: '20px'
+            }}
+          >
+            {/* ── Document Header (répété par chunk) ──────────────────────────────────────────────── */}
+            <div style={{ marginBottom: '6px', borderBottom: '2px solid #1e3a6e', paddingBottom: '4px' }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '16px' }}>
+                <h1 style={{
+                  fontSize: dedupedUnites.length > 15 ? '9pt' : '12pt',
                   fontWeight: 900,
-                  fontSize: '8pt',
                   textTransform: 'uppercase',
-                  letterSpacing: '0.2em',
-                  textAlign: 'center',
-                  border: '2px solid #1e3a6e',
-                  padding: '3px 5px',
-                  verticalAlign: 'middle',
-                }}
-              >
-                Plan de formation
-              </th>
+                  letterSpacing: '0.15em',
+                  color: '#1e3a6e',
+                  margin: 0
+                }}>
+                  Plan de Formation {weekChunks.length > 1 ? `(Partie ${chunkIndex + 1}/${weekChunks.length})` : ''}
+                </h1>
+                <span style={{ fontSize: dedupedUnites.length > 15 ? '8pt' : '9pt', fontWeight: 700, color: '#374151' }}>
+                  Formateur : {formateurNom}
+                </span>
+              </div>
+              <p style={{ fontSize: '6.5pt', color: '#6b7280', marginTop: '2px', marginBottom: 0 }}>
+                {programmeLabels.join('  |  ')} &nbsp;—&nbsp;
+                <strong>{dedupedUnites.length} unités</strong> &nbsp;—&nbsp;
+                <strong>{totalVhg} h VHG total</strong> &nbsp;—&nbsp;
+                <strong>Période : {getMonthName(chunk[0]?.week_start_date)} à {getMonthName(chunk[chunk.length - 1]?.week_start_date)}</strong>
+              </p>
+            </div>
 
-              {/* Month group headers — operating on activeWeeks only */}
-              <MonthHeaders weeks={activeWeeks} />
-            </tr>
+            {/* ── Table du chunk ─────────────────────────────────────────────────── */}
+            <table style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              tableLayout: 'fixed',
+              fontSize: fontSize,
+              fontFamily: 'Figtree, ui-sans-serif, system-ui, sans-serif',
+            }}>
+              <colgroup>
+                {/* Programme column — fixed ~10% */}
+                <col style={{ width: '10%' }} />
+                {/* Unité de formation — fixed ~18% */}
+                <col style={{ width: '18%' }} />
+                {/* One col per ACTIVE week in the chunk */}
+                {chunk.map((w) => (
+                  <col key={w?.semaine || Math.random()} style={{ width: `${72 / Math.max(chunk.length, 1)}%` }} />
+                ))}
+              </colgroup>
 
-            {/* Row 2: Sub-column labels + week Monday dates — Point 4 */}
-            <tr style={{ backgroundColor: '#f0f4f8' }}>
-              <th style={thStyle}>Programme</th>
-              <th style={{ ...thStyle, textAlign: 'left' }}>Unité de formation</th>
-              {/* Point 4: Monday day-only number in week header */}
-              {activeWeeks.map((w) => (
-                <th key={w?.semaine || Math.random()} style={{ ...thStyle, fontSize: '5.5pt' }}>
-                  {getMondayLabel(w)}
-                </th>
-              ))}
-            </tr>
-          </thead>
-
-          <tbody>
-            {dedupedUnites.map((unite, idx) => {
-              const weekMap = cellMaps[idx];
-
-              const programmeName = unite.logigramme
-                ? `${unite.logigramme.filiere?.code ?? ''} ${unite.logigramme.classe?.label ?? ''}`
-                : '—';
-
-              return (
-                <tr
-                  key={unite.id}
-                  style={{
-                    backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc',
-                    pageBreakInside: 'avoid',
-                    breakInside: 'avoid',
-                  }}
-                >
-                  {/* Programme */}
-                  <td style={{ ...tdStyle, fontSize: '5.5pt', fontWeight: 700, color: '#1e3a6e' }}>
-                    {programmeName}
-                  </td>
-                  {/* Unité name */}
-                  <td style={{ ...tdStyle, textAlign: 'left', fontWeight: 700, maxWidth: '138px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}
-                    title={unite.nom}>
-                    {unite.nom}
-                  </td>
-                  {/* VHG column REMOVED — Point 2 */}
-                  {/* Active week cells only — Point 3 */}
-                  {activeWeeks.map((w) => {
-                    const cell = w ? weekMap[w.semaine] : null;
-                    return (
-                      <td
-                        key={w?.semaine || Math.random()}
-                        onContextMenu={onContextMenu ? (e) => onContextMenu(e, unite, w?.semaine, cell) : undefined}
-                        style={{
-                          ...tdStyle,
-                          textAlign: 'center',
-                          backgroundColor: getCellColor(cell),
-                          fontSize: '6pt',
-                          fontWeight: cell?.heures ? 800 : 400,
-                          padding: '2px 1px',
-                        }}
-                      >
-                        {cell?.heures ? cell.heures : ''}
-                      </td>
-                    );
-                  })}
+              <thead>
+                <tr>
+                  <th
+                    colSpan={2}
+                    style={{
+                      backgroundColor: '#FFE600',
+                      color: '#000',
+                      fontWeight: 900,
+                      fontSize: '8pt',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.2em',
+                      textAlign: 'center',
+                      border: '2px solid #1e3a6e',
+                      padding: '3px 5px',
+                      verticalAlign: 'middle',
+                    }}
+                  >
+                    Plan de formation
+                  </th>
+                  <MonthHeaders weeks={chunk} />
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                <tr style={{ backgroundColor: '#f0f4f8' }}>
+                  <th style={thStyle}>Programme</th>
+                  <th style={{ ...thStyle, textAlign: 'left' }}>Unité de formation</th>
+                  {chunk.map((w) => (
+                    <th key={w?.semaine || Math.random()} style={{ ...thStyle, fontSize: '6pt' }}>
+                      {getMondayLabel(w)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
 
-        {/* ── Legend (print version — compact) ─────────────────────────────── */}
-        <div style={{
-          display: 'flex',
-          gap: '12px',
-          marginTop: '6px',
-          flexWrap: 'wrap',
-          fontSize: '6.5pt',
-          color: '#374151',
-        }}>
-          <LegendItem color="#FEF9C3" label="Session normale" />
-          <LegendItem color="#BBF7D0" label="Terminé" />
-          <LegendItem color="#F472B6" label="Vacance" />
-          <LegendItem color="#e2e8f0" label="Examen" />
-          <LegendItem color="#facc15" label="TIFF / Clôture" />
-        </div>
+              <tbody>
+                {dedupedUnites.map((unite, idx) => {
+                  const weekMap = cellMaps[idx];
+                  const programmeName = unite.logigramme
+                    ? `${unite.logigramme.filiere?.code ?? ''} ${unite.logigramme.classe?.label ?? ''}`
+                    : '—';
+
+                  return (
+                    <tr
+                      key={unite.id}
+                      style={{
+                        backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc',
+                        pageBreakInside: 'avoid',
+                        breakInside: 'avoid',
+                      }}
+                    >
+                      <td style={{ ...tdStyle, fontSize: '5.5pt', fontWeight: 700, color: '#1e3a6e' }}>
+                        {programmeName}
+                      </td>
+                      <td style={{ ...tdStyle, textAlign: 'left', fontWeight: 700, maxWidth: '138px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}
+                        title={unite.nom}>
+                        {unite.nom}
+                      </td>
+                      {chunk.map((w) => {
+                        const cell = w ? weekMap[w.semaine] : null;
+                        return (
+                          <td
+                            key={w?.semaine || Math.random()}
+                            onContextMenu={onContextMenu ? (e) => onContextMenu(e, unite, w?.semaine, cell) : undefined}
+                            style={{
+                              ...tdStyle,
+                              textAlign: 'center',
+                              backgroundColor: getCellColor(cell),
+                              fontSize: 'inherit', /* Inherits dynamic size from table */
+                              fontWeight: cell?.heures ? 800 : 400,
+                              padding: '2px 1px',
+                            }}
+                          >
+                            {cell?.heures ? cell.heures : ''}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            {/* ── Legend (print version — compact) ─────────────────────────────── */}
+            <div style={{
+              display: 'flex',
+              gap: '12px',
+              marginTop: '6px',
+              flexWrap: 'wrap',
+              fontSize: '6.5pt',
+              color: '#374151',
+            }}>
+              <LegendItem color="#FEF9C3" label="Session normale" />
+              <LegendItem color="#BBF7D0" label="Terminé" />
+              <LegendItem color="#F472B6" label="Vacance" />
+              <LegendItem color="#e2e8f0" label="Examen" />
+              <LegendItem color="#facc15" label="TIFF / Clôture" />
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
