@@ -190,7 +190,7 @@
 @page {
   /* Force landscape page layout and slim margins */
   size: A4 landscape;
-  margin: 5mm;
+  margin: 15mm 5mm 5mm 5mm;
 }
 
 @media print {
