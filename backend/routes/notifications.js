@@ -28,6 +28,14 @@ router.get('/', async (_req, res) => {
             id,
             nom,
             logigramme_id,
+            logigramme:logigrammes (
+              academic_year_id,
+              filiere_id,
+              classe_id,
+              filiere:filieres (
+                niveau
+              )
+            ),
             formateur_id,
             formateur:formateurs (
               id,

@@ -46,6 +46,7 @@ export async function runExamReminderCheck() {
           formateur:formateurs ( id, nom ),
           logigramme:logigrammes (
             id,
+            academic_year_id,
             filiere:filieres ( code, name ),
             classe:classes ( label )
           )
@@ -118,10 +119,12 @@ export async function runExamReminderCheck() {
 
     // Broadcast each notification to connected admin sockets
     for (const notif of notifications) {
+      const cell = pendingExamCells.find(c => c.id === notif.exam_cell_id);
       broadcastToAdmins('notification:new', {
         id: `temp-${notif.exam_cell_id}-${notif.notified_date}`,
         type: notif.type,
         exam_cell_id: notif.exam_cell_id,
+        exam_cell: cell,
         notified_date: notif.notified_date,
         message: notif.message,
         is_read: false,

@@ -36,7 +36,7 @@ import { useLogigrammeContext } from "@/contexts/logigramme-context"
 export function DashboardShell({ title, subtitle, navItems, activePath, navigate, accent = "admin", children }) {
   const { user, role, signOut } = useAuth()
   const logContext = useLogigrammeContext()
-  const { setFilter, setHighlightUniteId, setHighlightWeek, setHighlightCellId, setHighlightLogigrammeId } = logContext || {}
+  const { setFilter, setMultipleFilters, setHighlightUniteId, setHighlightWeek, setHighlightCellId, setHighlightLogigrammeId } = logContext || {}
 
   // isPinned = sidebar locked open by a deliberate click (persisted)
   // isHoverOpen = sidebar temporarily open by a 3-second hover preview (ephemeral)
@@ -260,36 +260,32 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
 
         {/* Main Content */}
         <section className="min-w-0 flex flex-col">
-          {/* Compact header */}
-          <header className="sticky top-0 z-20 flex h-20 items-center justify-between border-b border-slate-100 bg-white px-6 shadow-sm">
-            <div className="flex items-center gap-4">
+          {/* Compact header — uses theme tokens, no hardcoded slate/white */}
+          <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-border bg-card/95 backdrop-blur-sm px-6 shadow-sm">
+            <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={() => {
-                  // Clear any pending hover timer on click
                   if (hoverTimerRef.current) {
                     clearTimeout(hoverTimerRef.current);
                     hoverTimerRef.current = null;
                   }
-                  // Discard hover preview; toggle the pinned state
                   setIsHoverOpen(false);
                   setIsPinned(prev => !prev);
                 }}
                 onMouseEnter={() => {
-                  // Only start the hover timer when not already pinned open
                   if (isPinned) return;
                   hoverTimerRef.current = setTimeout(() => {
                     setIsHoverOpen(true);
                   }, 3000);
                 }}
                 onMouseLeave={() => {
-                  // Cancel timer if mouse leaves before 3 seconds
                   if (hoverTimerRef.current) {
                     clearTimeout(hoverTimerRef.current);
                     hoverTimerRef.current = null;
                   }
                 }}
-                className="hidden md:flex p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-all cursor-pointer"
+                className="hidden md:flex p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 border border-transparent hover:border-border/50 transition-colors duration-150 cursor-pointer"
                 aria-label={isPinned ? "Réduire la sidebar" : "Épingler la sidebar"}
               >
                 {sidebarOpen ? <PanelLeftClose className="size-4" /> : <PanelLeftOpen className="size-4" />}
@@ -298,15 +294,15 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
               <button
                 type="button"
                 onClick={() => setIsMobileOpen(true)}
-                className="md:hidden p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-all shrink-0 cursor-pointer"
+                className="md:hidden p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 border border-transparent hover:border-border/50 transition-colors duration-150 shrink-0 cursor-pointer"
                 aria-label="Open menu"
               >
                 <Menu className="size-4" />
               </button>
 
               <div className="flex flex-col">
-                <h1 className="text-lg md:text-xl font-bold tracking-tight text-slate-800 font-heading leading-tight">{title}</h1>
-                {subtitle && <p className="text-[11px] font-medium text-slate-500 hidden sm:block mt-0.5 leading-normal">{subtitle}</p>}
+                <h1 className="text-base md:text-lg font-bold tracking-tight text-foreground font-heading leading-tight">{title}</h1>
+                {subtitle && <p className="text-[11px] font-medium text-muted-foreground hidden sm:block mt-0.5 leading-normal">{subtitle}</p>}
               </div>
             </div>
 
@@ -432,8 +428,30 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
                                     if (setHighlightWeek) setHighlightWeek(semaine || null)
                                     if (setHighlightCellId) setHighlightCellId(cellId || null)
 
-                                    if (setFilter) {
-                                      // If formateur_id is present, we can filter by it
+                                    if (setMultipleFilters) {
+                                      const logi = examCell.unite?.logigramme
+                                      const updates = {};
+                                      
+                                      if (logi) {
+                                        if (logi.academic_year_id) updates.year_id = logi.academic_year_id;
+                                        if (logi.filiere?.niveau) updates.niveau_id = logi.filiere.niveau;
+                                        if (logi.filiere_id) updates.filiere_id = logi.filiere_id;
+                                        if (logi.classe_id) updates.classe_id = logi.classe_id;
+                                      }
+                                      
+                                      updates.formateur_id = formateurId || null;
+                                      
+                                      setMultipleFilters(updates);
+                                    } else if (setFilter) {
+                                      // Fallback for older context
+                                      const logi = examCell.unite?.logigramme
+                                      if (logi) {
+                                        if (logi.academic_year_id) setFilter('year_id', logi.academic_year_id)
+                                        if (logi.filiere?.niveau) setFilter('niveau_id', logi.filiere.niveau)
+                                        if (logi.filiere_id) setFilter('filiere_id', logi.filiere_id)
+                                        if (logi.classe_id) setFilter('classe_id', logi.classe_id)
+                                      }
+                                      
                                       if (formateurId) {
                                         setFilter('formateur_id', formateurId)
                                       } else {
@@ -494,23 +512,23 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
                 </div>
               )}
 
-              <div className="h-6 w-px bg-slate-200 mx-1.5" />
+              <div className="h-5 w-px bg-border mx-1" />
 
               <div className="relative" ref={dropdownRef}>
                 <button
                   onClick={() => setIsProfileOpen(!isProfileOpen)}
-                  className="flex items-center gap-2 p-1.5 px-3 rounded-xl bg-slate-50 border border-slate-200/60 hover:bg-slate-100/50 transition-all text-slate-700 shadow-sm group cursor-pointer"
+                  className="flex items-center gap-2 p-1.5 px-2.5 rounded-xl bg-muted/50 border border-border/60 hover:bg-muted hover:border-border transition-colors duration-150 text-foreground shadow-sm group cursor-pointer"
                 >
-                  <div className="size-6 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 shrink-0 group-hover:scale-105 transition-transform">
+                  <div className="size-6 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
                     <User className="size-3.5" />
                   </div>
-                  <span className="text-xs font-semibold text-slate-700 hidden sm:inline max-w-[150px] truncate">
+                  <span className="text-xs font-semibold text-foreground hidden sm:inline max-w-[150px] truncate">
                     {[
                       user?.user_metadata?.first_name || user?.user_metadata?.prenom,
                       user?.user_metadata?.last_name || user?.user_metadata?.nom
                     ].filter(Boolean).join(" ") || user?.email || "Utilisateur"}
                   </span>
-                  <ChevronDown className="size-3.5 text-slate-400 shrink-0" />
+                  <ChevronDown className="size-3.5 text-muted-foreground shrink-0" />
                 </button>
 
                 {isProfileOpen && (
