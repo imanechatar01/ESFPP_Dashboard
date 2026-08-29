@@ -20,6 +20,7 @@ import { ExamsManagement } from "@/pages/exams-management"
 import { StudentExam } from "@/pages/student-exam"
 import { ExamResults } from "@/pages/exam-results"
 import { ForgotPassword } from './pages/forgot-password';
+import { ThemeProvider } from "@/contexts/theme-context";
 import { ResetPassword } from './pages/reset-password';
 function usePath() {
   const [path, setPath] = useState(() => window.location.pathname)
@@ -127,8 +128,10 @@ function DashboardRedirect({ navigate }) {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppRoutes />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </ThemeProvider>
   )
 }

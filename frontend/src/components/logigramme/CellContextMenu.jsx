@@ -67,7 +67,7 @@ export function CellContextMenu({ x = 0, y = 0, onClose = () => {}, onSelect = (
   const menu = (
     <div
       ref={menuRef}
-      className="fixed z-[9999] min-w-[140px] bg-white rounded-md border border-slate-200 shadow-lg py-1 text-xs font-medium text-slate-700 no-print"
+      className="fixed z-[9999] min-w-[140px] bg-card rounded-md border border-border shadow-lg py-1 text-xs font-medium text-muted-foreground no-print"
       style={{ top: `${top}px`, left: `${left}px` }}
       onContextMenu={(e) => e.preventDefault()}
     >
@@ -78,48 +78,48 @@ export function CellContextMenu({ x = 0, y = 0, onClose = () => {}, onSelect = (
               e.stopPropagation();
               setShowHoursInput(true);
             }}
-            className="w-full text-left px-3 py-1.5 hover:bg-slate-100 flex items-center gap-2"
+            className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2"
           >
-            <span className="w-2.5 h-2.5 rounded-full bg-[#FEF9C3] border border-slate-300"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-status-normal border border-border"></span>
             Session
           </button>
           <button
             onClick={() => { onSelect('exam'); onClose(); }}
-            className="w-full text-left px-3 py-1.5 hover:bg-slate-100 flex items-center gap-2"
+            className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2"
           >
-            <span className="w-2.5 h-2.5 rounded-full bg-[#e2e8f0] border border-slate-300"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-status-exam border border-border"></span>
             Examen
           </button>
           <button
             onClick={() => { onSelect('tiff'); onClose(); }}
-            className="w-full text-left px-3 py-1.5 hover:bg-slate-100 flex items-center gap-2"
+            className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2"
           >
-            <span className="w-2.5 h-2.5 rounded-full bg-[#facc15] border border-slate-300"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-status-tiff border border-border"></span>
             TIFF / Clôture
           </button>
           <button
             onClick={() => { onSelect('vacation'); onClose(); }}
-            className="w-full text-left px-3 py-1.5 hover:bg-slate-100 flex items-center gap-2"
+            className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2"
           >
-            <span className="w-2.5 h-2.5 rounded-full bg-[#F472B6]"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-status-vacation"></span>
             Vacance
           </button>
-          <div className="h-px bg-slate-200 my-1"></div>
+          <div className="h-px bg-status-exam my-1"></div>
           <button
             onClick={() => { onSelect('empty'); onClose(); }}
-            className="w-full text-left px-3 py-1.5 hover:bg-red-50 text-red-600 flex items-center gap-2"
+            className="w-full text-left px-3 py-1.5 hover:bg-destructive/10 text-destructive flex items-center gap-2"
           >
             Supprimer
           </button>
         </>
       ) : (
         <form onSubmit={handleSessionSubmit} className="px-3 py-2 flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#FEF9C3] border border-slate-300 flex-shrink-0"></span>
+          <span className="w-2.5 h-2.5 rounded-full bg-status-normal border border-border flex-shrink-0"></span>
           <input
             ref={inputRef}
             type="text"
             inputMode="decimal"
-            className="w-16 px-1 py-0.5 border border-slate-300 rounded text-xs"
+            className="w-16 px-1 py-0.5 border border-border rounded text-xs"
             placeholder="Heures"
             value={hours}
             onChange={(e) => {

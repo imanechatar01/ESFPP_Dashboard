@@ -112,27 +112,27 @@ export function computeProgress(vhg, cells) {
  * Map cell types to CSS classes
  */
 export function getCellClassName(type, status) {
-  const base = "relative w-10 h-12 border-r border-b border-slate-300 text-[11px] font-bold flex items-center justify-center transition-all cursor-pointer select-none";
+  const base = "relative w-10 h-12 border-r border-b border-border text-[11px] font-bold flex items-center justify-center transition-all cursor-pointer select-none";
   
   const isDone = status === 'done' || status === 'auto_done';
   
-  if (type === 'vacation') return `${base} bg-[#F472B6] text-white border-slate-300 cursor-default font-extrabold text-[12px]`;
+  if (type === 'vacation') return `${base} bg-status-vacation text-white cursor-default font-extrabold text-[12px]`;
   if (type === 'exam') {
     if (isDone) {
       // Deep teal-green: visually distinct from normal 'done' mint (#BBF7D0)
-      return `${base} bg-exam-done text-exam-done-fg border-exam-done/40 hover:bg-exam-done/90`;
+      return `${base} bg-exam-done text-exam-done-fg hover:bg-exam-done/90`;
     }
     // Soft red: exam not yet validated by admin
-    return `${base} bg-exam-pending text-exam-pending-fg border-exam-pending-fg/30 hover:bg-exam-pending/80`;
+    return `${base} bg-exam-pending text-exam-pending-fg hover:bg-exam-pending/80`;
   }
-  if (type === 'tiff') return `${base} bg-yellow-400 text-yellow-900 border-slate-300 cursor-default`;
+  if (type === 'tiff') return `${base} bg-status-tiff text-status-header-fg cursor-default`;
   
   if (type === 'normal') {
     if (isDone) {
-      return `${base} bg-[#BBF7D0] text-slate-800 border-slate-300 hover:bg-[#A7F3D0]`;
+      return `${base} bg-status-done text-foreground hover:bg-status-done/80`;
     }
-    return `${base} bg-[#FEF9C3] text-slate-800 border-slate-300 hover:bg-[#FEF08A]`;
+    return `${base} bg-status-normal text-foreground hover:bg-status-normal/80`;
   }
   
-  return `${base} bg-white text-transparent border-slate-300`;
+  return `${base} bg-card text-transparent`;
 }

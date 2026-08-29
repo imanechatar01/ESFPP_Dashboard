@@ -22,7 +22,7 @@ export function GridCell({ cell, semaine, onToggle, onContextMenu, isHighlighted
     return (
       <div
         className={cn(
-          "w-10 h-12 border-r border-b border-slate-300 bg-white",
+          "w-10 h-12 border-r border-b border-border bg-card",
           isExamHighlight && "ring-4 ring-accent ring-inset z-20 animate-pulse bg-accent/10"
         )}
         onContextMenu={handleContextMenu}
@@ -47,7 +47,7 @@ export function GridCell({ cell, semaine, onToggle, onContextMenu, isHighlighted
       onContextMenu={handleContextMenu}
       className={cn(
         getCellClassName(cell_type, completion_status),
-        isHighlighted && "ring-2 ring-destructive ring-inset z-20 shadow-[0_0_8px_rgba(239,68,68,0.4)]",
+        isHighlighted && "ring-2 ring-destructive ring-inset z-20 shadow-md shadow-destructive/40",
         isExamHighlight && "ring-4 ring-accent ring-inset z-20 animate-pulse"
       )}
       title={isHighlighted ? "CONFLIT D'HORAIRE ! " + (isNormal ? `${displayHeuresLabel}h` : cell_type) : (isNormal ? `${displayHeuresLabel}h - ${completion_status}` : cell_type)}
@@ -56,14 +56,14 @@ export function GridCell({ cell, semaine, onToggle, onContextMenu, isHighlighted
       {cell_type === 'exam' && (
         <>
           <span>E</span>
-          {isDone && <span className="absolute top-0.5 right-0.5 text-[8px] font-bold text-emerald-600">✔</span>}
+          {isDone && <span className="absolute top-0.5 right-0.5 text-[8px] font-bold text-accent">✔</span>}
         </>
       )}
       {cell_type === 'tiff' && 'T'}
       {isNormal && (
         <>
           <span>{displayHeures !== null ? displayHeures : ''}</span>
-          {isDone && <span className="absolute top-0.5 right-0.5 text-[8px] font-bold text-emerald-600">✔</span>}
+          {isDone && <span className="absolute top-0.5 right-0.5 text-[8px] font-bold text-accent">✔</span>}
         </>
       )}
     </div>

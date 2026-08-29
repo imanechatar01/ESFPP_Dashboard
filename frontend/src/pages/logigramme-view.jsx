@@ -57,9 +57,9 @@ export function LogigrammeView({ path, navigate }) {
     const result = await Swal.fire({
       title: 'Supprimer ce logigramme ?',
       html: `
-        <p style="font-size:0.85rem;color:#6b7280;margin-bottom:6px">Vous êtes sur le point de supprimer :</p>
-        <p style="font-weight:800;font-size:0.95rem;margin:8px 0;color:#1e293b">"${label}"</p>
-        <p style="font-size:0.8rem;color:#ef4444;margin-top:6px">
+        <p style="font-size:0.85rem;color:var(--color-muted-foreground);margin-bottom:6px">Vous êtes sur le point de supprimer :</p>
+        <p style="font-weight:800;font-size:0.95rem;margin:8px 0;color:var(--color-foreground)">"${label}"</p>
+        <p style="font-size:0.8rem;color:var(--color-destructive);margin-top:6px">
           Cette action est irréversible et supprimera toutes les unités,
           cellules et données de progression associées.
         </p>`,
@@ -67,8 +67,11 @@ export function LogigrammeView({ path, navigate }) {
       showCancelButton: true,
       confirmButtonText: 'Oui, supprimer',
       cancelButtonText: 'Annuler',
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#64748b',
+      customClass: {
+        confirmButton: 'bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-md px-4 py-2 font-bold mx-2 transition-colors',
+        cancelButton: 'bg-muted text-muted-foreground hover:bg-muted/80 rounded-md px-4 py-2 font-bold mx-2 transition-colors'
+      },
+      buttonsStyling: false,
       reverseButtons: true,
       focusCancel: true,
     })
@@ -93,7 +96,10 @@ export function LogigrammeView({ path, navigate }) {
         title: 'Erreur',
         text: `La suppression a échoué : ${err.message}`,
         icon: 'error',
-        confirmButtonColor: '#ef4444',
+        customClass: {
+          confirmButton: 'bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-md px-4 py-2 font-bold mx-2 transition-colors'
+        },
+        buttonsStyling: false,
       })
     }
   }
@@ -156,8 +162,9 @@ export function LogigrammeView({ path, navigate }) {
         <FilterBar className="mb-0 flex-1 min-w-0" />
         <div className="flex items-center gap-2 lg:flex-shrink-0 w-full lg:w-auto justify-end">
           <Button
+            variant="default"
             onClick={() => setIsImportModalOpen(true)}
-            className="rounded-xl font-bold uppercase tracking-widest text-[10px] h-[34px] px-3 flex-1 sm:flex-initial"
+            className="rounded-lg font-bold uppercase tracking-widest text-[10px] h-[34px] px-3 flex-1 sm:flex-initial shadow-sm hover:shadow-md transition-shadow"
           >
             <Upload className="size-3.5 mr-1.5" />
             Importer
@@ -167,7 +174,7 @@ export function LogigrammeView({ path, navigate }) {
             <Button
               variant="outline"
               onClick={() => setIsEditModalOpen(true)}
-              className="rounded-xl font-bold uppercase tracking-widest text-[10px] h-[34px] px-3 flex-1 sm:flex-initial"
+              className="rounded-lg font-bold uppercase tracking-widest text-[10px] h-[34px] px-3 flex-1 sm:flex-initial shadow-sm hover:shadow-md transition-shadow"
             >
               <Pencil className="size-3.5 mr-1.5" />
               Éditer
@@ -175,9 +182,9 @@ export function LogigrammeView({ path, navigate }) {
           )}
 
           <Button
-            variant="outline"
+            variant="secondary"
             onClick={() => setIsDuplicateModalOpen(true)}
-            className="rounded-xl font-bold uppercase tracking-widest text-[10px] h-[34px] px-3 flex-1 sm:flex-initial border-primary/30 text-primary hover:bg-primary/5"
+            className="rounded-lg font-bold uppercase tracking-widest text-[10px] h-[34px] px-3 flex-1 sm:flex-initial shadow-sm hover:shadow-md transition-shadow"
             title="Dupliquer tous les logigrammes vers une autre année"
           >
             <Copy className="size-3.5 mr-1.5" />
@@ -186,8 +193,9 @@ export function LogigrammeView({ path, navigate }) {
 
           {filters.formateur_id && (
             <Button
+              variant="secondary"
               onClick={() => window.print()}
-              className="rounded-xl font-bold uppercase tracking-widest text-[10px] h-[34px] px-3 flex-1 sm:flex-initial bg-primary text-primary-foreground hover:bg-primary/90"
+              className="rounded-lg font-bold uppercase tracking-widest text-[10px] h-[34px] px-3 flex-1 sm:flex-initial shadow-sm hover:shadow-md transition-shadow"
             >
               <Printer className="size-3.5 mr-1.5" />
               Imprimer

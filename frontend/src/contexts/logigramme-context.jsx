@@ -101,6 +101,10 @@ export function LogigrammeProvider({ children }) {
     });
   };
 
+  const setMultipleFilters = (updates) => {
+    setFiltersState(prev => ({ ...prev, ...updates }));
+  };
+
   const resetFilters = () => {
     const current = years.find(yr => yr.is_current);
     setFiltersState({ ...defaultFilters, year_id: current?.id ?? null });
@@ -113,7 +117,7 @@ export function LogigrammeProvider({ children }) {
 
   return (
     <LogigrammeContext.Provider value={{
-      filters, setFilter, resetFilters,
+      filters, setFilter, setMultipleFilters, resetFilters,
       years, filieres, formateurs, classes, niveaux,
       loading, refreshLookups: loadLookups,
       kpis, loadingKpis, refreshKpis: fetchKpis,

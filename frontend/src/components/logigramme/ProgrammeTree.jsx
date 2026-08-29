@@ -98,12 +98,12 @@ function FiliereSection({ group, activeLogId, onSelect, onDelete }) {
                   </div>
                   <div className={cn(
                     "h-1 w-full rounded-full overflow-hidden",
-                    activeLogId === log.id ? "bg-white/20" : "bg-muted"
+                    activeLogId === log.id ? "bg-card/20" : "bg-muted"
                   )}>
                     <div 
                       className={cn(
                         "h-full transition-all duration-500",
-                        activeLogId === log.id ? "bg-white" : "bg-primary"
+                        activeLogId === log.id ? "bg-card" : "bg-primary"
                       )}
                       style={{ width: `${progressValue}%` }}
                     />

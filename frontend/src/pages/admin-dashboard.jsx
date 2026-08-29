@@ -92,64 +92,65 @@ export function AdminDashboard({ path, navigate }) {
       activePath={path}
       navigate={navigate}
     >
-      <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+      {/* KPI Cards — no translate hover (avoids layout shift, see ui-ux-pro-max checklist) */}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {statCards.map((stat) => (
-          <section key={stat.label} className="group relative overflow-hidden rounded-2xl border border-border bg-card p-6 transition-all hover:shadow-xl hover:shadow-primary/5 hover:-translate-y-1">
-            <div className="flex items-center justify-between">
-              <div className={cn("flex size-12 items-center justify-center rounded-xl transition-colors", stat.bg)}>
-                <stat.icon className={cn("size-6", stat.color)} />
+          <section key={stat.label} className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 transition-shadow duration-200 hover:shadow-lg hover:shadow-primary/5 cursor-default">
+            {/* Subtle gradient background on hover */}
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none" aria-hidden="true" />
+            <div className="relative flex items-center justify-between">
+              <div className={cn("flex size-11 items-center justify-center rounded-xl transition-colors", stat.bg)}>
+                <stat.icon className={cn("size-5", stat.color)} />
               </div>
-              <ArrowUpRight className="size-4 text-muted-foreground/30 transition-colors group-hover:text-primary" />
+              <ArrowUpRight className="size-4 text-muted-foreground/20 transition-colors duration-150 group-hover:text-primary/50" />
             </div>
-            <div className="mt-4">
-              <p className="text-sm font-bold text-muted-foreground uppercase tracking-wider">{stat.label}</p>
-              <div className="flex items-baseline gap-2 mt-1">
-                <p className="text-3xl font-black tracking-tight">{stat.value}</p>
-              </div>
-              <p className="mt-1 text-xs font-medium text-muted-foreground/70">{stat.helper}</p>
+            <div className="relative mt-4">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{stat.label}</p>
+              <p className="mt-1 text-3xl font-black tracking-tight text-foreground">{stat.value}</p>
+              <p className="mt-1 text-xs font-medium text-muted-foreground/60">{stat.helper}</p>
             </div>
           </section>
         ))}
       </div>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-        <section className="rounded-2xl border border-border bg-card p-6 shadow-sm medical-glass">
-          <div className="flex items-center justify-between mb-6">
+      <div className="mt-6 grid gap-4 lg:grid-cols-[1.6fr_1fr]">
+        <section className="dashboard-card medical-glass">
+          <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-primary/10">
                 <GraduationCap className="size-5 text-primary" />
               </div>
-              <h2 className="text-lg font-bold tracking-tight">Suivi académique</h2>
+              <h2 className="text-base font-bold tracking-tight text-foreground">Suivi académique</h2>
             </div>
           </div>
           
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-3">
             {[
               { title: "Filières", count: stats.totalFilieres, desc: "Total des filières" },
               { title: "Évaluations", count: stats.totalControles, desc: "Total des contrôles" },
               { title: "Étudiants", count: stats.totalStudents, desc: "Inscrits" }
             ].map((item) => (
-              <div key={item.title} className="group cursor-pointer rounded-xl border border-border bg-background/50 p-5 transition-all hover:border-primary/50 hover:bg-primary/[0.02]">
+              <div key={item.title} className="rounded-xl border border-border bg-background/50 p-4 transition-colors duration-150 hover:border-primary/30 hover:bg-primary/[0.02] cursor-default">
                 <p className="text-sm font-bold text-foreground">{item.title}</p>
-                <p className="mt-2 text-xl font-black text-primary">{item.count}</p>
+                <p className="mt-2 text-2xl font-black text-primary">{item.count}</p>
                 <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">{item.desc}</p>
               </div>
             ))}
           </div>
           
-          <div className="mt-8 p-6 rounded-xl bg-muted/30 border border-dashed border-border flex flex-col items-center text-center">
-            <Activity className="size-8 text-muted-foreground/30 mb-3" />
+          <div className="mt-6 p-5 rounded-xl bg-muted/30 border border-dashed border-border flex flex-col items-center text-center">
+            <Activity className="size-7 text-muted-foreground/25 mb-2" />
             <p className="text-sm font-semibold text-muted-foreground">Espace réservé aux futurs modules métier</p>
             <p className="text-xs text-muted-foreground/60 mt-1">La gestion des notes et plannings détaillés sera disponible prochainement.</p>
           </div>
         </section>
 
-        <section className="rounded-2xl border border-border bg-card p-6 shadow-sm medical-glass">
-          <div className="flex items-center gap-3 mb-6">
+        <section className="dashboard-card medical-glass">
+          <div className="flex items-center gap-3 mb-5">
             <div className="p-2 rounded-lg bg-accent/10">
               <CalendarCheck className="size-5 text-accent" />
             </div>
-            <h2 className="text-lg font-bold tracking-tight">Activité récente</h2>
+            <h2 className="text-base font-bold tracking-tight text-foreground">Activité récente</h2>
           </div>
           
           <div className="space-y-4">
