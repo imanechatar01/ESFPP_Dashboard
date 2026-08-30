@@ -31,6 +31,8 @@ dist-ssr
 *.sw?
 
 .env
+.agents
+.agent
 #ignoring the .md file except the readme.md :
 *.md
 !README.md
