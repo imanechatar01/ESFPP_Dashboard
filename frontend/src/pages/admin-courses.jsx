@@ -267,7 +267,7 @@ export function AdminCourses({ path, navigate }) {
           {(message || error) && (
             <div className={cn(
               "mt-4 p-4 rounded-xl text-xs font-bold border animate-in fade-in zoom-in-95 duration-200",
-              error ? "bg-rose-50 border-rose-100 text-rose-600" : "bg-primary/5 border-primary/10 text-primary"
+              error ? "bg-destructive/10 border-destructive/20 text-destructive" : "bg-primary/5 border-primary/10 text-primary"
             )}>
               {error || message}
             </div>
@@ -275,7 +275,7 @@ export function AdminCourses({ path, navigate }) {
         </section>
 
         {/* List column */}
-        <section className="min-w-0 rounded-xl border border-border bg-white p-6 shadow-sm flex flex-col h-full min-h-0">
+        <section className="min-w-0 rounded-xl border border-border bg-card text-card-foreground p-6 shadow-sm flex flex-col h-full min-h-0">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-6">
             <h2 className="text-lg font-bold tracking-tight">Vidéos de cours publiées</h2>
 
@@ -285,14 +285,14 @@ export function AdminCourses({ path, navigate }) {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground/50" />
                 <Input
                   placeholder="Rechercher un cours..."
-                  className="pl-9 h-9 rounded-lg"
+                  className="pl-9 h-9 rounded-lg bg-background border-border text-foreground"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
 
               <select
-                className="h-9 rounded-lg border border-border bg-background px-3 text-xs font-semibold outline-none focus:border-primary"
+                className="h-9 rounded-lg border border-border bg-background px-3 text-xs font-semibold outline-none focus:border-primary text-foreground"
                 value={filterFiliere}
                 onChange={(e) => setFilterFiliere(e.target.value)}
               >
@@ -318,7 +318,7 @@ export function AdminCourses({ path, navigate }) {
             <div className="overflow-y-auto flex-1 pr-2 custom-scrollbar min-h-0">
               <div className="grid gap-4 sm:grid-cols-2 pb-4">
                 {filteredCourses.map((course) => (
-                  <div key={course.id} className="group relative rounded-xl border border-border bg-background/40 hover:bg-background/80 hover:shadow-md p-5 transition-all flex flex-col justify-between min-w-0">
+                  <div key={course.id} className="group relative rounded-xl border border-border bg-card text-card-foreground hover:bg-card/90 hover:shadow-md p-5 transition-all flex flex-col justify-between min-w-0">
                     <div>
                       <div className="flex items-center justify-between gap-2 mb-2">
                         <span className="inline-flex items-center rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider border border-primary/20">
@@ -359,7 +359,7 @@ export function AdminCourses({ path, navigate }) {
                         <Button
                           size="xs"
                           variant="ghost"
-                          className="size-8 p-0 text-muted-foreground hover:text-rose-600 rounded-lg"
+                          className="size-8 p-0 text-muted-foreground hover:text-destructive rounded-lg"
                           onClick={() => handleDelete(course.id)}
                         >
                           <Trash2 className="size-3.5" />
