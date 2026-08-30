@@ -46,21 +46,21 @@ export function WeekContextMenu({ x = 0, y = 0, onClose = () => {}, onSelect = (
   const menu = (
     <div
       ref={menuRef}
-      className="fixed z-[9999] min-w-[220px] bg-white rounded-md border border-slate-200 shadow-lg py-1 text-xs font-medium text-slate-700 no-print"
+      className="fixed z-[9999] min-w-[220px] bg-card rounded-md border border-border shadow-lg py-1 text-xs font-medium text-muted-foreground no-print"
       style={{ top: `${top}px`, left: `${left}px` }}
       onContextMenu={(e) => e.preventDefault()}
     >
       <button
         onClick={() => { onSelect('mark_done'); onClose(); }}
-        className="w-full text-left px-3 py-1.5 hover:bg-slate-100 flex items-center gap-2"
+        className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2"
       >
-        <span className="w-2.5 h-2.5 rounded-full bg-[#BBF7D0] border border-slate-300"></span>
+        <span className="w-2.5 h-2.5 rounded-full bg-status-done border border-border"></span>
         Marquer la semaine comme terminée
       </button>
-      <div className="h-px bg-slate-200 my-1"></div>
+      <div className="h-px bg-status-exam my-1"></div>
       <button
         onClick={() => { onSelect('clear'); onClose(); }}
-        className="w-full text-left px-3 py-1.5 hover:bg-red-50 text-red-600 flex items-center gap-2"
+        className="w-full text-left px-3 py-1.5 hover:bg-destructive/10 text-destructive flex items-center gap-2"
       >
         Supprimer la semaine
       </button>

@@ -50,6 +50,15 @@
   --color-foreground: var(--foreground);
   --color-background: var(--background);
   
+  --color-status-header: var(--status-header);
+  --color-status-header-fg: var(--status-header-fg);
+  --color-status-normal: var(--status-normal);
+  --color-status-done: var(--status-done);
+  --color-status-vacation: var(--status-vacation);
+  --color-status-exam: var(--status-exam);
+  --color-status-tiff: var(--status-tiff);
+  --color-status-progression: var(--status-progression);
+  
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -114,48 +123,80 @@
   --sidebar-accent-foreground: oklch(0.35 0.1 200);
   --sidebar-border: oklch(0.9 0.02 210);
   --sidebar-ring: oklch(0.42 0.12 245);
+  
+  --status-header: oklch(0.95 0.15 100); 
+  --status-header-fg: oklch(0.2 0.05 100);
+  --status-normal: oklch(0.97 0.04 100); 
+  --status-done: oklch(0.9 0.1 140); 
+  --status-vacation: oklch(0.7 0.15 330); 
+  --status-exam: oklch(0.9 0.02 240); 
+  --status-tiff: oklch(0.8 0.15 100); 
+  --status-progression: oklch(0.4 0.1 250); 
 }
 
 .dark {
-  --background: oklch(0.18 0.03 240);
-  --foreground: oklch(0.95 0.01 220);
+  /* Base surfaces — card slightly lighter than background for visible separation */
+  --background: oklch(0.15 0.025 245);
+  --foreground: oklch(0.96 0.008 220);
 
-  --exam-pending: oklch(0.30 0.08 22);
-  --exam-pending-fg: oklch(0.88 0.09 22);
-  --exam-done: oklch(0.28 0.08 165);
-  --exam-done-fg: oklch(0.85 0.08 165);
-  
+  /* Exam cell states — kept vivid enough against dark surfaces */
+  --exam-pending: oklch(0.32 0.09 22);
+  --exam-pending-fg: oklch(0.92 0.08 22);
+  --exam-done: oklch(0.30 0.09 165);
+  --exam-done-fg: oklch(0.90 0.07 165);
+
+  /* Cards are clearly distinct from page background */
   --card: oklch(0.22 0.03 245);
-  --card-foreground: oklch(0.95 0.01 220);
-  
-  --popover: oklch(0.22 0.03 245);
-  --popover-foreground: oklch(0.95 0.01 220);
-  
-  --primary: oklch(0.65 0.12 225);
-  --primary-foreground: oklch(0.18 0.03 240);
-  
-  --secondary: oklch(0.28 0.04 235);
-  --secondary-foreground: oklch(0.9 0.02 210);
-  
-  --muted: oklch(0.28 0.04 235);
-  --muted-foreground: oklch(0.65 0.03 220);
-  
-  --accent: oklch(0.55 0.15 165);
+  --card-foreground: oklch(0.96 0.008 220);
+
+  --popover: oklch(0.24 0.03 245);
+  --popover-foreground: oklch(0.96 0.008 220);
+
+  /* Primary: bright enough on dark bg for AA contrast (~5.5:1) */
+  --primary: oklch(0.72 0.13 225);
+  --primary-foreground: oklch(0.14 0.03 240);
+
+  /* Secondary: subtle tinted surface */
+  --secondary: oklch(0.27 0.04 235);
+  --secondary-foreground: oklch(0.93 0.015 210);
+
+  /* Muted: slightly lighter than secondary so text on muted bg has contrast */
+  --muted: oklch(0.27 0.035 235);
+  --muted-foreground: oklch(0.72 0.025 220);  /* raised from 0.65 → legible secondary text */
+
+  /* Accent: vivid green — bright enough against dark card */
+  --accent: oklch(0.60 0.16 160);
   --accent-foreground: oklch(0.98 0.02 170);
-  
-  --destructive: oklch(0.5 0.18 25);
-  --border: oklch(0.3 0.03 235);
-  --input: oklch(0.3 0.03 235);
-  --ring: oklch(0.65 0.12 225);
-  
-  --sidebar: oklch(0.2 0.03 245);
-  --sidebar-foreground: oklch(0.9 0.02 220);
-  --sidebar-primary: oklch(0.65 0.12 225);
-  --sidebar-primary-foreground: oklch(0.18 0.03 240);
-  --sidebar-accent: oklch(0.28 0.04 235);
-  --sidebar-accent-foreground: oklch(0.95 0.01 220);
-  --sidebar-border: oklch(0.3 0.03 235);
-  --sidebar-ring: oklch(0.65 0.12 225);
+
+  --destructive: oklch(0.55 0.20 25);          /* slightly brighter for AA on dark bg */
+  --border: oklch(0.32 0.03 235);
+  --input: oklch(0.32 0.03 235);
+  --ring: oklch(0.72 0.13 225);
+
+  --chart-1: oklch(0.68 0.13 225);
+  --chart-2: oklch(0.60 0.16 160);
+  --chart-3: oklch(0.50 0.12 205);
+  --chart-4: oklch(0.68 0.10 225);
+  --chart-5: oklch(0.58 0.15 185);
+
+  --sidebar: oklch(0.19 0.03 245);
+  --sidebar-foreground: oklch(0.93 0.015 220);
+  --sidebar-primary: oklch(0.72 0.13 225);
+  --sidebar-primary-foreground: oklch(0.14 0.03 240);
+  --sidebar-accent: oklch(0.27 0.04 235);
+  --sidebar-accent-foreground: oklch(0.96 0.008 220);
+  --sidebar-border: oklch(0.32 0.03 235);
+  --sidebar-ring: oklch(0.72 0.13 225);
+
+  /* Status colors — lightness raised so they contrast against dark card bg */
+  --status-header: oklch(0.48 0.16 100);
+  --status-header-fg: oklch(0.97 0.04 100);
+  --status-normal: oklch(0.36 0.09 100);
+  --status-done: oklch(0.38 0.12 140);
+  --status-vacation: oklch(0.45 0.17 330);
+  --status-exam: oklch(0.34 0.04 240);
+  --status-tiff: oklch(0.55 0.16 100);
+  --status-progression: oklch(0.65 0.16 250);
 }
 
 @layer base {
@@ -172,12 +213,35 @@
 
 /* Custom Healthcare UI Enhancements */
 @layer components {
+  /* Glass card — uses theme tokens for both light and dark modes */
   .medical-glass {
-    @apply bg-white/70 backdrop-blur-md border border-white/20 shadow-sm;
+    @apply bg-card/80 backdrop-blur-md border border-border/40 shadow-sm;
   }
-  
   .dark .medical-glass {
-    @apply bg-slate-900/60 backdrop-blur-md border border-slate-700/30;
+    @apply bg-card/70 backdrop-blur-md border border-border/30;
+  }
+
+  /* Reusable dashboard card with polished hover */
+  .dashboard-card {
+    @apply rounded-2xl border border-border bg-card p-6 shadow-sm
+           transition-shadow duration-200
+           hover:shadow-md hover:shadow-primary/5
+           hover:border-border/80;
+  }
+
+  /* Focus ring consistent with brand */
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2;
+  }
+}
+
+/* Respect user motion preferences — disable all CSS animations and transitions */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
@@ -329,7 +393,36 @@
     print-color-adjust: exact !important;
   }
 
-
+  /* Force light mode tokens for print */
+  :root, .dark {
+    --background: oklch(0.98 0.005 195);
+    --foreground: oklch(0.25 0.06 230);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.25 0.06 230);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.25 0.06 230);
+    --primary: oklch(0.42 0.12 245); 
+    --primary-foreground: oklch(0.99 0.005 245);
+    --secondary: oklch(0.85 0.08 195);
+    --secondary-foreground: oklch(0.35 0.1 200);
+    --muted: oklch(0.94 0.01 200);
+    --muted-foreground: oklch(0.5 0.03 210);
+    --accent: oklch(0.6 0.15 160);
+    --accent-foreground: oklch(0.98 0.02 165);
+    --destructive: oklch(0.55 0.18 25);
+    --border: oklch(0.9 0.02 210);
+    --input: oklch(0.9 0.02 210);
+    --ring: oklch(0.42 0.12 245);
+    
+    --status-header: oklch(0.95 0.15 100); 
+    --status-header-fg: oklch(0.2 0.05 100);
+    --status-normal: oklch(0.97 0.04 100); 
+    --status-done: oklch(0.9 0.1 140); 
+    --status-vacation: oklch(0.7 0.15 330); 
+    --status-exam: oklch(0.9 0.02 240); 
+    --status-tiff: oklch(0.8 0.15 100); 
+    --status-progression: oklch(0.4 0.1 250);
+  }
 }
 
 /* Custom scrollbar styling */

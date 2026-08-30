@@ -25,18 +25,23 @@ import {
   CheckCheck,
   Trash2,
   ClipboardList,
-  BellRing
+  BellRing,
+  Sun,
+  Moon,
+  Monitor
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
 import { useNotifications } from "@/hooks/useNotifications"
 import { useLogigrammeContext } from "@/contexts/logigramme-context"
+import { useTheme } from "@/contexts/theme-context"
 
 export function DashboardShell({ title, subtitle, navItems, activePath, navigate, accent = "admin", children }) {
   const { user, role, signOut } = useAuth()
   const logContext = useLogigrammeContext()
   const { setFilter, setMultipleFilters, setHighlightUniteId, setHighlightWeek, setHighlightCellId, setHighlightLogigrammeId } = logContext || {}
+  const { theme, setTheme } = useTheme()
 
   // isPinned = sidebar locked open by a deliberate click (persisted)
   // isHoverOpen = sidebar temporarily open by a 3-second hover preview (ephemeral)
@@ -261,7 +266,7 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
         {/* Main Content */}
         <section className="min-w-0 flex flex-col">
           {/* Compact header — uses theme tokens, no hardcoded slate/white */}
-          <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-border bg-card/95 backdrop-blur-sm px-6 shadow-sm">
+          <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-border bg-card/95 backdrop-blur-sm px-6 shadow-sm">
             <div className="flex items-center gap-3">
               <button
                 type="button"
@@ -307,6 +312,9 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
             </div>
 
             <div className="flex items-center gap-3">
+              {/* Theme Toggle — single button opens a dropdown */}
+              <ThemeToggle theme={theme} setTheme={setTheme} />
+
               {/* Bell — only shown to admin, wired to real notifications */}
               {isAdmin && (
                 <div className="relative" ref={bellRef}>
@@ -319,11 +327,11 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
                       setIsBellOpen(opening)
                       if (!opening) setShowClearConfirm(false)
                     }}
-                    className="p-2 rounded-xl text-slate-400 hover:text-primary hover:bg-primary/8 border border-transparent hover:border-primary/15 transition-all relative cursor-pointer"
+                    className="p-2 rounded-xl text-muted-foreground hover:text-primary hover:bg-primary/8 border border-transparent hover:border-primary/15 transition-all relative cursor-pointer"
                   >
                     {unreadCount > 0 ? <BellRing className="size-4 text-primary animate-bounce-short" /> : <Bell className="size-4" />}
                     {unreadCount > 0 && (
-                      <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-0.5 bg-destructive rounded-full ring-2 ring-white flex items-center justify-center text-[8px] font-black text-white leading-none">
+                      <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-0.5 bg-destructive rounded-full ring-2 ring-card flex items-center justify-center text-[8px] font-black text-white leading-none">
                         {unreadCount > 9 ? '9+' : unreadCount}
                       </span>
                     )}
@@ -332,7 +340,7 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
                   {isBellOpen && (
                     <div
                       id="notifications-dropdown"
-                      className="absolute right-0 top-full mt-2 w-96 rounded-2xl border border-border/50 bg-white/95 shadow-2xl shadow-primary/12 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+                      className="absolute right-0 top-full mt-2 w-96 rounded-2xl border border-border/50 bg-popover shadow-2xl shadow-primary/12 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200"
                       style={{ backdropFilter: 'blur(16px)' }}
                     >
                       {/* Header */}
@@ -483,7 +491,7 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
                                 <div className="flex items-start justify-between gap-2">
                                   <p className={cn(
                                     "text-[10px] leading-snug line-clamp-2",
-                                    !notif.is_read ? "font-bold text-slate-800" : "font-medium text-muted-foreground"
+                                    !notif.is_read ? "font-bold text-foreground" : "font-medium text-muted-foreground"
                                   )}>{notif.message}</p>
                                   {/* Unread dot */}
                                   {!notif.is_read && (
@@ -553,7 +561,7 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
 
                     <button
                       onClick={handleSignOut}
-                      className="flex w-full items-center gap-2 px-2 py-1.5 rounded-lg text-xs font-bold text-rose-500 hover:bg-rose-500/10 transition-colors"
+                      className="flex w-full items-center gap-2 px-2 py-1.5 rounded-lg text-xs font-bold text-destructive hover:bg-destructive/10 transition-colors"
                     >
                       <LogOut className="size-3" />
                       Déconnexion
@@ -571,6 +579,65 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
       </div>
     </main>
   )
+}
+
+// ── Theme Toggle ─────────────────────────────────────────────────────────────
+// A single button showing the active theme icon; click opens a 3-option dropdown.
+function ThemeToggle({ theme, setTheme }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const Icon = theme === "dark" ? Moon : theme === "light" ? Sun : Monitor;
+
+  const options = [
+    { value: "light", label: "Clair",   Icon: Sun },
+    { value: "system", label: "Système", Icon: Monitor },
+    { value: "dark",  label: "Sombre",  Icon: Moon },
+  ];
+
+  return (
+    <div className="relative hidden sm:block" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="p-2 rounded-xl text-muted-foreground hover:text-primary hover:bg-primary/8 border border-transparent hover:border-primary/15 transition-all cursor-pointer"
+        title="Changer le thème"
+        aria-label="Changer le thème"
+      >
+        <Icon className="size-4" />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-1 w-36 rounded-xl border border-border bg-popover p-1 shadow-xl z-50 animate-in fade-in zoom-in-95 duration-150">
+          {options.map(({ value, label, Icon: OptionIcon }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => { setTheme(value); setOpen(false); }}
+              className={cn(
+                "flex w-full items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors",
+                theme === value
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+            >
+              <OptionIcon className="size-3.5 shrink-0" />
+              {label}
+              {theme === value && <span className="ml-auto size-1.5 rounded-full bg-primary" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function formatRelativeTime(dateStr) {

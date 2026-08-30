@@ -302,7 +302,7 @@ export function ImportModal({ isOpen, onClose, onImportSuccess }) {
                 className={cn(
                   "relative border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center gap-3 transition-all cursor-pointer",
                   dragActive ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 bg-background/50",
-                  file && "border-emerald-500/50 bg-emerald-500/5"
+                  file && "border-accent/50 bg-status-done/5"
                 )}
               >
                 <input
@@ -316,7 +316,7 @@ export function ImportModal({ isOpen, onClose, onImportSuccess }) {
                 
                 {file ? (
                   <>
-                    <div className="size-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 animate-in zoom-in-95">
+                    <div className="size-12 rounded-2xl bg-status-done/10 flex items-center justify-center text-accent animate-in zoom-in-95">
                       <FileSpreadsheet className="size-6" />
                     </div>
                     <div className="text-center">
@@ -392,7 +392,7 @@ export function ImportModal({ isOpen, onClose, onImportSuccess }) {
         ) : (
           /* Success Screen */
           <div className="space-y-6 text-center py-4 animate-in zoom-in-95 duration-200">
-            <div className="size-16 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center mx-auto shadow-sm">
+            <div className="size-16 rounded-full bg-status-done/10 text-accent flex items-center justify-center mx-auto shadow-sm">
               <Check className="size-8" />
             </div>
             

@@ -45,10 +45,10 @@ export function HeatmapView({ onSelectRow }) {
 
   const getCellColor = (taux, hasCells) => {
     if (!hasCells) return 'bg-muted/30'; // diagonal hatch pattern could be added via CSS
-    if (taux === 0) return 'bg-slate-200/50';
-    if (taux === 1) return 'bg-emerald-500';
-    if (taux >= 0.5) return 'bg-blue-400';
-    return 'bg-orange-300';
+    if (taux === 0) return 'bg-status-exam/50';
+    if (taux === 1) return 'bg-status-done';
+    if (taux >= 0.5) return 'bg-primary/60';
+    return 'bg-status-progression/60';
   };
 
   return (
@@ -75,8 +75,8 @@ export function HeatmapView({ onSelectRow }) {
               ))}
             </tr>
             {/* Week numbers */}
-            <tr className="bg-white">
-              <th className="sticky left-0 z-20 bg-white border-b border-r border-border p-2 w-[240px] text-left font-black uppercase tracking-widest text-muted-foreground/80">Logigramme</th>
+            <tr className="bg-card">
+              <th className="sticky left-0 z-20 bg-card border-b border-r border-border p-2 w-[240px] text-left font-black uppercase tracking-widest text-muted-foreground/80">Logigramme</th>
               {weeks.map(w => (
                 <th key={w.semaine} className="border-b border-r border-border w-6 h-6 font-bold text-muted-foreground/40">
                   {w.semaine}
@@ -88,7 +88,7 @@ export function HeatmapView({ onSelectRow }) {
             {rows.map(row => (
               <tr key={row.logigramme_id} className="group hover:bg-muted/10">
                 <td 
-                  className="sticky left-0 z-10 bg-white border-b border-r border-border p-2 w-[240px] font-bold text-foreground cursor-pointer hover:text-primary transition-colors truncate"
+                  className="sticky left-0 z-10 bg-card border-b border-r border-border p-2 w-[240px] font-bold text-foreground cursor-pointer hover:text-primary transition-colors truncate"
                   onClick={() => onSelectRow(row.logigramme_id)}
                 >
                   {row.label}
@@ -114,19 +114,19 @@ export function HeatmapView({ onSelectRow }) {
       {/* Legend */}
       <div className="p-4 bg-muted/5 border-t border-border flex flex-wrap gap-4 items-center">
         <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 bg-slate-200/50 rounded-sm" />
+          <div className="w-3 h-3 bg-status-exam/50 rounded-sm" />
           <span className="text-[9px] font-bold uppercase text-muted-foreground">0%</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 bg-orange-300 rounded-sm" />
+          <div className="w-3 h-3 bg-status-progression/60 rounded-sm" />
           <span className="text-[9px] font-bold uppercase text-muted-foreground">1-49%</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 bg-blue-400 rounded-sm" />
+          <div className="w-3 h-3 bg-primary/60 rounded-sm" />
           <span className="text-[9px] font-bold uppercase text-muted-foreground">50-99%</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 bg-emerald-500 rounded-sm" />
+          <div className="w-3 h-3 bg-status-done rounded-sm" />
           <span className="text-[9px] font-bold uppercase text-muted-foreground">100%</span>
         </div>
         <div className="flex items-center gap-1.5">

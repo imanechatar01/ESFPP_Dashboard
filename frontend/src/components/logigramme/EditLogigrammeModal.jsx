@@ -209,7 +209,7 @@ export function EditLogigrammeModal({ isOpen, onClose, logigrammeData, onSaveSuc
           </div>
         )}
         {successMsg && (
-          <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 text-xs font-bold flex items-center gap-2 mb-4 animate-in slide-in-from-top-2 shrink-0">
+          <div className="p-3 rounded-xl bg-status-done/10 border border-accent/20 text-accent text-xs font-bold flex items-center gap-2 mb-4 animate-in slide-in-from-top-2 shrink-0">
             <Save className="size-4 shrink-0" />
             <span>{successMsg}</span>
           </div>

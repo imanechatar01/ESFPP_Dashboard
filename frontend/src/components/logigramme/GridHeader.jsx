@@ -6,8 +6,8 @@ export function GridHeader({ weeks, onMarkWeek, onContextMenu }) {
   return (
     <div className="flex flex-col sticky top-0 z-30 shadow-sm select-none">
       {/* 1. Semesters and Months */}
-      <div className="flex w-fit bg-white border-b border-slate-300">
-         <div className="sticky left-0 z-30 w-[520px] bg-[#FFE600] border-r border-slate-300 flex items-center justify-center text-[12px] font-black uppercase tracking-[0.25em] text-black flex-shrink-0">
+      <div className="flex w-fit bg-card border-b border-border">
+         <div className="sticky left-0 z-30 w-[520px] bg-status-header border-r border-border flex items-center justify-center text-[12px] font-black uppercase tracking-[0.25em] text-status-header-fg flex-shrink-0">
            Plan de formation
          </div>
          <div className="flex">
@@ -30,8 +30,8 @@ export function GridHeader({ weeks, onMarkWeek, onContextMenu }) {
              return (
                <div
                  key={idx}
-                 className={`relative w-10 h-10 bg-white flex items-center justify-center ${
-                   isLastInMonth ? 'border-r border-slate-300' : ''
+                 className={`relative w-10 h-10 bg-card flex items-center justify-center ${
+                   isLastInMonth ? 'border-r border-border' : ''
                  }`}
                >
                  {isFirstInMonth && (
@@ -39,7 +39,7 @@ export function GridHeader({ weeks, onMarkWeek, onContextMenu }) {
                      className="absolute left-0 top-0 h-full flex items-center justify-center pointer-events-none z-10"
                      style={{ width: `${groupCount * weekColumnWidth}px` }}
                    >
-                     <span className="text-[11px] font-extrabold uppercase text-slate-800 tracking-wider whitespace-nowrap">
+                     <span className="text-[11px] font-extrabold uppercase text-foreground tracking-wider whitespace-nowrap">
                        {monthName}
                      </span>
                    </div>
@@ -48,16 +48,16 @@ export function GridHeader({ weeks, onMarkWeek, onContextMenu }) {
              );
            })}
          </div>
-         <div className="sticky right-0 z-30 w-24 bg-white border-l border-slate-300 flex items-center justify-center text-[11px] font-black text-slate-800 uppercase flex-shrink-0">Progression</div>
+         <div className="sticky right-0 z-30 w-24 bg-card border-l border-border flex items-center justify-center text-[11px] font-black text-foreground uppercase flex-shrink-0">Progression</div>
       </div>
 
       {/* 2. Week Numbers */}
-      <div className="flex w-fit bg-white border-b border-slate-300">
-         <div className="sticky left-0 z-30 flex bg-white border-r border-slate-300 flex-shrink-0">
-            <div className="w-10 h-8 flex items-center justify-center text-[10px] font-black text-slate-700 border-r border-slate-300">N°</div>
-            <div className="w-64 h-8 flex items-center px-3 text-[10px] font-black text-slate-700 border-r border-slate-300 uppercase">Unité de formation</div>
-            <div className="w-40 h-8 flex items-center justify-center px-3 text-[10px] font-black text-slate-700 border-r border-slate-300 uppercase">Formateur</div>
-            <div className="w-16 h-8 flex items-center justify-center text-[10px] font-black text-slate-700 uppercase">VHG</div>
+      <div className="flex w-fit bg-card border-b border-border">
+         <div className="sticky left-0 z-30 flex bg-card border-r border-border flex-shrink-0">
+            <div className="w-10 h-8 flex items-center justify-center text-[10px] font-black text-muted-foreground border-r border-border">N°</div>
+            <div className="w-64 h-8 flex items-center px-3 text-[10px] font-black text-muted-foreground border-r border-border uppercase">Unité de formation</div>
+            <div className="w-40 h-8 flex items-center justify-center px-3 text-[10px] font-black text-muted-foreground border-r border-border uppercase">Formateur</div>
+            <div className="w-16 h-8 flex items-center justify-center text-[10px] font-black text-muted-foreground uppercase">VHG</div>
          </div>
          <div className="flex">
            {weeks.map((w, idx) => (
@@ -65,30 +65,30 @@ export function GridHeader({ weeks, onMarkWeek, onContextMenu }) {
                key={idx}
                onClick={() => onMarkWeek && onMarkWeek(w.semaine, 'done')}
                onContextMenu={onContextMenu ? (e) => onContextMenu(e, w.semaine) : undefined}
-               className="w-10 h-8 border-r border-slate-300 flex items-center justify-center text-[10px] font-extrabold text-slate-800 hover:bg-slate-100 cursor-pointer transition-colors"
+               className="w-10 h-8 border-r border-border flex items-center justify-center text-[10px] font-extrabold text-foreground hover:bg-muted cursor-pointer transition-colors"
                title="Clic droit pour ouvrir les options de semaine"
              >
                {w.semaine}
              </div>
            ))}
          </div>
-         <div className="sticky right-0 z-30 w-24 bg-white border-l border-slate-300 h-8 flex-shrink-0" />
+         <div className="sticky right-0 z-30 w-24 bg-card border-l border-border h-8 flex-shrink-0" />
       </div>
 
       {/* 3. Dates */}
-      <div className="flex w-fit bg-white border-b border-slate-300">
-         <div className="sticky left-0 z-30 w-[520px] bg-white border-r border-slate-300 h-6 flex-shrink-0" />
+      <div className="flex w-fit bg-card border-b border-border">
+         <div className="sticky left-0 z-30 w-[520px] bg-card border-r border-border h-6 flex-shrink-0" />
          <div className="flex">
            {weeks.map((w, idx) => (
              <div
                key={idx}
-               className="w-10 h-6 border-r border-slate-300 flex items-center justify-center text-[8px] font-bold text-slate-500"
+               className="w-10 h-6 border-r border-border flex items-center justify-center text-[8px] font-bold text-muted-foreground"
              >
                {formatShortDate(w.week_start_date)}
              </div>
            ))}
          </div>
-         <div className="sticky right-0 z-30 w-24 bg-white border-l border-slate-300 h-6 flex-shrink-0" />
+         <div className="sticky right-0 z-30 w-24 bg-card border-l border-border h-6 flex-shrink-0" />
       </div>
     </div>
   );
