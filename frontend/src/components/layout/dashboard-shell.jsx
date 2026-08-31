@@ -67,9 +67,11 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
   const userRole = role || (accent === "student" ? "student" : "admin")
   const isStudent = userRole === "student"
   const isAdmin = !isStudent
-
-  // Notifications — only loaded for admins
   const { notifications, unreadCount, markAllRead, markRead, clearAll } = useNotifications()
+  const userDisplayName = [
+    user?.user_metadata?.first_name || user?.user_metadata?.firstName || user?.user_metadata?.prenom,
+    user?.user_metadata?.last_name || user?.user_metadata?.lastName || user?.user_metadata?.nom,
+  ].filter(Boolean).join(" ") || user?.email || "Utilisateur"
 
   // Utiliser navItems passé en props, sinon utiliser les items par défaut
   const defaultNavItems = isStudent
@@ -152,10 +154,10 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
   }
 
   return (
-    <main className="min-h-screen bg-background text-foreground overflow-hidden">
+    <main className="min-h-dvh overflow-x-clip bg-background text-foreground">
       <div
         className={cn(
-          "grid min-h-screen transition-all duration-300 ease-in-out grid-cols-1",
+          "grid min-h-dvh grid-cols-1 transition-all duration-300 ease-in-out",
           // Layout column only expands when pinned, not during hover preview
           isPinned ? "md:grid-cols-[200px_1fr]" : "md:grid-cols-[64px_1fr]"
         )}
@@ -171,7 +173,7 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
         {/* Sidebar */}
         <aside
           className={cn(
-            "fixed inset-y-0 left-0 z-50 flex flex-col border-r border-border bg-sidebar/95 backdrop-blur-2xl px-2 py-4 transform transition-all duration-300 ease-in-out shadow-2xl md:static md:translate-x-0 md:bg-sidebar/50 md:shadow-none md:overflow-hidden",
+            "fixed inset-y-0 left-0 z-50 flex h-dvh flex-col overflow-hidden border-r border-border bg-sidebar/95 px-2 py-4 shadow-2xl backdrop-blur-2xl transform transition-all duration-300 ease-in-out md:translate-x-0 md:bg-sidebar/50 md:shadow-none",
             isMobileOpen ? "translate-x-0" : "-translate-x-full",
             sidebarOpen ? "md:w-[200px]" : "md:w-16"
           )}
@@ -206,7 +208,7 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
             </button>
           </div>
 
-          <nav className="flex flex-col gap-4 flex-1 overflow-y-auto custom-scrollbar">
+          <nav className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto custom-scrollbar">
             {menuSections.map((section) => (
               <div key={section.title} className="flex flex-col gap-1">
                 {(sidebarOpen || isMobileOpen) && section.items.length > 0 && (
@@ -248,7 +250,7 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
             ))}
           </nav>
 
-          <div className="mt-auto px-1">
+          <div className="mt-auto shrink-0 px-1">
             {(sidebarOpen || isMobileOpen) ? (
               <div className="p-2 rounded-xl bg-muted/50 border border-border/50 animate-in zoom-in-95 duration-300">
                 <p className="text-[10px] font-semibold text-muted-foreground">Support</p>
@@ -264,10 +266,10 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
         </aside>
 
         {/* Main Content */}
-        <section className="min-w-0 flex flex-col">
-          {/* Compact header — uses theme tokens, no hardcoded slate/white */}
-          <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-border bg-card/95 backdrop-blur-sm px-6 shadow-sm">
-            <div className="flex items-center gap-3">
+        <section className="flex min-h-dvh min-w-0 flex-col md:col-start-2">
+          {/* Compact header */}
+          <header className="sticky top-0 z-[100] flex h-20 shrink-0 items-center justify-between border-b border-border bg-card px-6 shadow-sm">
+            <div className="flex items-center gap-4">
               <button
                 type="button"
                 onClick={() => {
@@ -337,7 +339,7 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
                     )}
                   </button>
 
-                  {isBellOpen && (
+   {isBellOpen && (
                     <div
                       id="notifications-dropdown"
                       className="absolute right-0 top-full mt-2 w-96 rounded-2xl border border-border/50 bg-popover shadow-2xl shadow-primary/12 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200"
@@ -521,8 +523,7 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
               )}
 
               <div className="h-5 w-px bg-border mx-1" />
-
-              <div className="relative" ref={dropdownRef}>
+              <div className="relative z-[101]" ref={dropdownRef}>
                 <button
                   onClick={() => setIsProfileOpen(!isProfileOpen)}
                   className="flex items-center gap-2 p-1.5 px-2.5 rounded-xl bg-muted/50 border border-border/60 hover:bg-muted hover:border-border transition-colors duration-150 text-foreground shadow-sm group cursor-pointer"
@@ -531,19 +532,19 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
                     <User className="size-3.5" />
                   </div>
                   <span className="text-xs font-semibold text-foreground hidden sm:inline max-w-[150px] truncate">
-                    {[
-                      user?.user_metadata?.first_name || user?.user_metadata?.prenom,
-                      user?.user_metadata?.last_name || user?.user_metadata?.nom
-                    ].filter(Boolean).join(" ") || user?.email || "Utilisateur"}
+                    {userDisplayName}
                   </span>
                   <ChevronDown className="size-3.5 text-muted-foreground shrink-0" />
                 </button>
 
                 {isProfileOpen && (
-                  <div className="absolute right-0 top-full mt-1 w-56 rounded-xl border border-border bg-card p-1.5 shadow-2xl shadow-primary/10 animate-in fade-in zoom-in-95 duration-200 z-50 medical-glass">
+                  <div className="absolute right-0 top-full z-[1000] mt-1 w-56 rounded-xl border border-border bg-card p-1.5 shadow-2xl shadow-primary/10 animate-in fade-in zoom-in-95 duration-200 medical-glass">
                     <div className="px-2 py-2 border-b border-border/50 mb-1">
                       <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Connecté</p>
-                      <p className="text-xs font-bold text-foreground mt-0.5 truncate">{user?.email}</p>
+                      <p className="text-xs font-bold text-foreground mt-0.5 truncate">{userDisplayName}</p>
+                      {user?.email && userDisplayName !== user.email && (
+                        <p className="text-[10px] font-medium text-muted-foreground mt-0.5 truncate">{user.email}</p>
+                      )}
                     </div>
 
                     <div className="space-y-0.5">
@@ -572,7 +573,7 @@ export function DashboardShell({ title, subtitle, navItems, activePath, navigate
             </div>
           </header>
 
-          <div className="w-full px-4 md:px-6 py-6 flex-1 overflow-y-auto overflow-x-hidden">
+          <div className="w-full flex-1 overflow-x-hidden px-4 py-6 md:px-6">
             {children}
           </div>
         </section>

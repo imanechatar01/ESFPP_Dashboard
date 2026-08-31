@@ -258,7 +258,7 @@ export default function FormateursManagement({ path, navigate }) {
 
       {/* Add/Edit Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl medical-glass animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-bold tracking-tight">
@@ -316,7 +316,7 @@ export default function FormateursManagement({ path, navigate }) {
 
       {/* Replace Modal */}
       {isReplaceModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl medical-glass animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between mb-6">
               <div>
@@ -416,7 +416,7 @@ export default function FormateursManagement({ path, navigate }) {
 
       {/* Delete Confirmation */}
       {isDeleteModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-sm rounded-2xl border border-destructive/20 bg-card p-6 shadow-2xl animate-in zoom-in-95 duration-200 text-center">
             <h3 className="text-lg font-bold tracking-tight">Supprimer ?</h3>
             <p className="mt-2 text-sm text-muted-foreground font-medium">

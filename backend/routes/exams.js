@@ -5,6 +5,34 @@ import { requireRole } from "../lib/auth.js"
 
 const router = express.Router()
 const PASSING_PERCENTAGE = 60
+const QUESTION_TYPES = new Set(["qcu", "qcm", "liaison"])
+
+function getQuestionType(question) {
+  return QUESTION_TYPES.has(question?.type) ? question.type : "qcu"
+}
+
+function getCorrectAnswers(question) {
+  if (Array.isArray(question?.correctAnswers)) return question.correctAnswers
+  return question?.correctAnswer == null ? [] : [Number(question.correctAnswer)]
+}
+
+function isQuestionCorrect(question, answer) {
+  const type = getQuestionType(question)
+  const correctAnswers = getCorrectAnswers(question).map(Number)
+
+  if (type === "qcu") return Number(answer) === correctAnswers[0]
+
+  if (!Array.isArray(answer) || answer.length !== correctAnswers.length) return false
+  const normalizedAnswer = answer.map(Number)
+
+  if (type === "qcm") {
+    const selected = [...new Set(normalizedAnswer)].sort((a, b) => a - b)
+    const expected = [...new Set(correctAnswers)].sort((a, b) => a - b)
+    return selected.length === expected.length && selected.every((value, index) => value === expected[index])
+  }
+
+  return normalizedAnswer.every((value, index) => value === correctAnswers[index])
+}
 
 function formatAttempt(row) {
   const percentage = Number(row.percentage || 0)
@@ -33,12 +61,20 @@ function mapExam(row, includeCorrectAnswers = false) {
     locked: row.locked,
     createdAt: row.created_at,
     questions: questions.map((question) => {
+      const type = getQuestionType(question)
       const safeQuestion = {
         id: question.id,
+        type,
         statement: question.statement,
-        options: Array.isArray(question.options) ? question.options : [],
+        options: Array.isArray(question.options)
+          ? question.options.map((option) =>
+              type === "liaison"
+                ? { left: String(option?.left || ""), right: String(option?.right || "") }
+                : String(option || ""),
+            )
+          : [],
       }
-      if (includeCorrectAnswers) safeQuestion.correctAnswer = question.correctAnswer
+      if (includeCorrectAnswers) safeQuestion.correctAnswers = getCorrectAnswers(question)
       return safeQuestion
     }),
   }
@@ -60,28 +96,67 @@ function validateExamPayload(body) {
 
   const normalizedQuestions = []
   for (const question of questions) {
+    if (question?.type && !QUESTION_TYPES.has(question.type)) {
+      return { error: "Le type d'une ou plusieurs questions est invalide" }
+    }
+    const type = getQuestionType(question)
     const statement = String(question.statement || "").trim()
-    const options = Array.isArray(question.options)
-      ? question.options.map((option) => String(option || "").trim())
-      : []
-    const correctAnswer = Number(question.correctAnswer)
+    const rawOptions = Array.isArray(question.options) ? question.options : []
+    const rawCorrectAnswers = getCorrectAnswers(question).map(Number)
+    let options
+    let correctAnswers
 
-    if (
-      !statement ||
-      options.length !== 4 ||
-      options.some((option) => !option) ||
-      !Number.isInteger(correctAnswer) ||
-      correctAnswer < 0 ||
-      correctAnswer > 3
-    ) {
-      return { error: "Une ou plusieurs questions sont invalides" }
+    if (type === "liaison") {
+      options = rawOptions.map((option) => ({
+        left: String(option?.left || "").trim(),
+        right: String(option?.right || "").trim(),
+      }))
+      correctAnswers = rawCorrectAnswers.length
+        ? rawCorrectAnswers
+        : options.map((_, index) => index)
+
+      const validLinks =
+        options.length >= 2 &&
+        options.every((option) => option.left && option.right) &&
+        new Set(options.map((option) => option.left.toLowerCase())).size === options.length &&
+        new Set(options.map((option) => option.right.toLowerCase())).size === options.length &&
+        correctAnswers.length === options.length &&
+        correctAnswers.every(
+          (answer, index) => Number.isInteger(answer) && answer >= 0 && answer < options.length && correctAnswers.indexOf(answer) === index,
+        )
+
+      if (!statement || !validLinks) {
+        return { error: "Une question de liaison doit contenir au moins deux paires valides" }
+      }
+    } else {
+      options = rawOptions.map((option) => String(option || "").trim())
+      correctAnswers = [...new Set(rawCorrectAnswers)]
+      const validAnswers = correctAnswers.every(
+        (answer) => Number.isInteger(answer) && answer >= 0 && answer < options.length,
+      )
+      const validAnswerCount = type === "qcu"
+        ? correctAnswers.length === 1
+        : correctAnswers.length >= 2
+
+      if (
+        !statement ||
+        options.length !== 4 ||
+        options.some((option) => !option) ||
+        !validAnswers ||
+        !validAnswerCount
+      ) {
+        return { error: type === "qcm"
+          ? "Une question QCM doit contenir quatre options et au moins deux bonnes réponses"
+          : "Une question QCU doit contenir quatre options et une bonne réponse" }
+      }
     }
 
     normalizedQuestions.push({
       id: String(question.id || randomUUID()),
+      type,
       statement,
       options,
-      correctAnswer,
+      correctAnswers,
     })
   }
 
@@ -326,7 +401,7 @@ router.post("/:id/submit", requireRole("student"), async (req, res) => {
     const questions = Array.isArray(exam.questions) ? exam.questions : []
     const score = questions.reduce(
       (total, question) =>
-        Number(answers[question.id]) === Number(question.correctAnswer) ? total + 1 : total,
+        isQuestionCorrect(question, answers[question.id]) ? total + 1 : total,
       0,
     )
     const percentage = questions.length

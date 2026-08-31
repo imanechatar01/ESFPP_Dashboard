@@ -13,6 +13,7 @@ import {
   Edit3,
   FileQuestion,
   GraduationCap,
+  Link2,
   Lock,
   Plus,
   Save,
@@ -25,6 +26,11 @@ import { DashboardShell } from "@/components/layout/dashboard-shell"
 
 const STORAGE_KEY = "esfpp-admin-exams"
 const DURATIONS = [30, 45, 60, 90, 120]
+const QUESTION_TYPES = [
+  { value: "qcu", label: "QCU (Choix Unique)" },
+  { value: "qcm", label: "QCM (Choix Multiple)" },
+  { value: "liaison", label: "Liaison (Associer des éléments)" },
+]
 
 const DEMO_EXAMS = [
   {
@@ -89,10 +95,106 @@ const EMPTY_EXAM = {
   questions: [],
 }
 
-const EMPTY_QUESTION = {
-  statement: "",
-  options: ["", "", "", ""],
-  correctAnswer: 0,
+function createEmptyQuestion(type = "qcu") {
+  if (type === "liaison") {
+    return {
+      type,
+      statement: "",
+      options: [
+        { left: "", right: "" },
+        { left: "", right: "" },
+      ],
+      correctAnswers: [0, 1],
+    }
+  }
+
+  return {
+    type,
+    statement: "",
+    options: ["", "", "", ""],
+    correctAnswers: type === "qcu" ? [0] : [],
+  }
+}
+
+function normalizeQuestion(question) {
+  const type = QUESTION_TYPES.some((item) => item.value === question?.type) ? question.type : "qcu"
+  const legacyCorrectAnswers = Array.isArray(question?.correctAnswers)
+    ? question.correctAnswers.map(Number)
+    : question?.correctAnswer == null ? [] : [Number(question.correctAnswer)]
+  const { correctAnswer: _legacyCorrectAnswer, ...rest } = question || {}
+
+  if (type === "liaison") {
+    const options = Array.isArray(question?.options)
+      ? question.options.map((pair) => ({ left: pair?.left || "", right: pair?.right || "" }))
+      : []
+    const normalizedOptions = options.length ? options : createEmptyQuestion("liaison").options
+    return {
+      ...rest,
+      type,
+      statement: question?.statement || "",
+      options: normalizedOptions,
+      correctAnswers: legacyCorrectAnswers.length
+        ? legacyCorrectAnswers
+        : normalizedOptions.map((_, index) => index),
+    }
+  }
+
+  return {
+    ...rest,
+    type,
+    statement: question?.statement || "",
+    options: Array.isArray(question?.options) ? [...question.options] : ["", "", "", ""],
+    correctAnswers: legacyCorrectAnswers.length ? legacyCorrectAnswers : type === "qcu" ? [0] : [],
+  }
+}
+
+function validateQuestion(question) {
+  const normalized = normalizeQuestion(question)
+  const statement = normalized.statement.trim()
+
+  if (!statement) return { error: "Saisissez l'énoncé de la question." }
+
+  if (normalized.type === "liaison") {
+    const options = normalized.options.map((pair) => ({
+      left: pair.left.trim(),
+      right: pair.right.trim(),
+    }))
+    const uniqueLeft = new Set(options.map((pair) => pair.left.toLowerCase())).size === options.length
+    const uniqueRight = new Set(options.map((pair) => pair.right.toLowerCase())).size === options.length
+    if (
+      options.length < 2 ||
+      options.some((pair) => !pair.left || !pair.right) ||
+      !uniqueLeft ||
+      !uniqueRight
+    ) {
+      return { error: "Ajoutez au moins deux paires complètes pour la question de liaison." }
+    }
+    return {
+      value: {
+        ...normalized,
+        statement,
+        options,
+        correctAnswers: options.map((_, index) => index),
+      },
+    }
+  }
+
+  const options = normalized.options.map((option) => String(option || "").trim())
+  const correctAnswers = [...new Set(normalized.correctAnswers.map(Number))]
+  const validCorrectAnswers = correctAnswers.every(
+    (answer) => Number.isInteger(answer) && answer >= 0 && answer < options.length,
+  )
+  if (options.length !== 4 || options.some((option) => !option)) {
+    return { error: "Complétez les quatre options de réponse." }
+  }
+  if (!validCorrectAnswers || (normalized.type === "qcu" && correctAnswers.length !== 1)) {
+    return { error: "Sélectionnez une seule bonne réponse pour la question QCU." }
+  }
+  if (normalized.type === "qcm" && correctAnswers.length < 2) {
+    return { error: "Sélectionnez au moins deux bonnes réponses pour la question QCM." }
+  }
+
+  return { value: { ...normalized, statement, options, correctAnswers } }
 }
 
 function makeId(prefix) {
@@ -131,10 +233,57 @@ function QuestionComposer({
   actionLabel = "Ajouter la question",
   onCancel,
 }) {
+  const question = normalizeQuestion(value)
+
   const setOption = (index, optionValue) => {
-    const nextOptions = [...value.options]
+    const nextOptions = [...question.options]
     nextOptions[index] = optionValue
-    onChange({ ...value, options: nextOptions })
+    onChange({ ...question, options: nextOptions })
+  }
+
+  const toggleCorrectAnswer = (index) => {
+    if (question.type === "qcu") {
+      onChange({ ...question, correctAnswers: [index] })
+      return
+    }
+
+    const selected = question.correctAnswers.includes(index)
+    onChange({
+      ...question,
+      correctAnswers: selected
+        ? question.correctAnswers.filter((answer) => answer !== index)
+        : [...question.correctAnswers, index].sort((a, b) => a - b),
+    })
+  }
+
+  const setPair = (index, field, fieldValue) => {
+    const nextOptions = question.options.map((pair, pairIndex) =>
+      pairIndex === index ? { ...pair, [field]: fieldValue } : pair,
+    )
+    onChange({
+      ...question,
+      options: nextOptions,
+      correctAnswers: nextOptions.map((_, answerIndex) => answerIndex),
+    })
+  }
+
+  const addPair = () => {
+    const nextOptions = [...question.options, { left: "", right: "" }]
+    onChange({
+      ...question,
+      options: nextOptions,
+      correctAnswers: nextOptions.map((_, index) => index),
+    })
+  }
+
+  const removePair = (index) => {
+    if (question.options.length <= 2) return
+    const nextOptions = question.options.filter((_, pairIndex) => pairIndex !== index)
+    onChange({
+      ...question,
+      options: nextOptions,
+      correctAnswers: nextOptions.map((_, answerIndex) => answerIndex),
+    })
   }
 
   return (
@@ -147,61 +296,132 @@ function QuestionComposer({
           <div>
             <h3 className="text-sm font-bold text-foreground">Nouvelle question</h3>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Saisissez quatre réponses et sélectionnez la bonne.
+              Combinez librement des QCU, QCM et questions de liaison dans le même examen.
             </p>
           </div>
         </div>
       )}
 
+      <div className="mb-4">
+        <FieldLabel required>Type de question</FieldLabel>
+        <div className="relative">
+          <select
+            value={question.type}
+            onChange={(event) => {
+              const nextQuestion = createEmptyQuestion(event.target.value)
+              onChange({ ...nextQuestion, statement: question.statement })
+            }}
+            className="h-11 w-full appearance-none rounded-lg border border-border bg-card px-3.5 pr-9 text-sm font-semibold text-foreground outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
+          >
+            {QUESTION_TYPES.map((type) => (
+              <option key={type.value} value={type.value}>{type.label}</option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        </div>
+      </div>
+
       <div>
         <FieldLabel required>Énoncé de la question</FieldLabel>
         <textarea
           rows={compact ? 2 : 3}
-          value={value.statement}
-          onChange={(event) => onChange({ ...value, statement: event.target.value })}
+          value={question.statement}
+          onChange={(event) => onChange({ ...question, statement: event.target.value })}
           placeholder="Ex. Quelle est la première étape avant d'administrer un médicament ?"
           className="w-full resize-none rounded-lg border border-border bg-card px-3.5 py-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-4 focus:ring-primary/15"
         />
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        {value.options.map((option, index) => {
-          const selected = value.correctAnswer === index
-          return (
-            <label
-              key={index}
-              className={`group flex cursor-pointer items-center gap-3 rounded-lg border bg-card p-3 transition ${
-                selected
-                  ? "border-accent ring-2 ring-accent/15"
-                  : "border-border hover:border-primary/40"
-              }`}
-            >
-              <input
-                type="radio"
-                name={compact ? "modal-correct-answer" : "create-correct-answer"}
-                checked={selected}
-                onChange={() => onChange({ ...value, correctAnswer: index })}
-                className="size-4 accent-[var(--accent)]"
-              />
-              <span
-                className={`flex size-6 shrink-0 items-center justify-center rounded-md text-[11px] font-bold ${
-                  selected ? "bg-accent/15 text-accent" : "bg-muted text-muted-foreground"
-                }`}
-              >
-                {String.fromCharCode(65 + index)}
-              </span>
+      {question.type === "liaison" ? (
+        <div className="mt-4 space-y-3">
+          <div className="grid grid-cols-[1fr_auto_1fr_auto] gap-2 px-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            <span>Élément A</span>
+            <span />
+            <span>Élément B associé</span>
+            <span />
+          </div>
+          {question.options.map((pair, index) => (
+            <div key={index} className="grid items-center gap-2 rounded-xl border border-border bg-card p-3 sm:grid-cols-[1fr_auto_1fr_auto]">
               <input
                 type="text"
-                value={option}
-                onChange={(event) => setOption(index, event.target.value)}
-                placeholder={`Option ${index + 1}`}
-                className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/70"
+                value={pair.left}
+                onChange={(event) => setPair(index, "left", event.target.value)}
+                placeholder={`Élément A${index + 1}`}
+                className="h-10 min-w-0 rounded-lg bg-muted/50 px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/20"
               />
-              {selected && <Check className="size-4 shrink-0 text-accent" />}
-            </label>
-          )
-        })}
-      </div>
+              <Link2 className="mx-auto size-4 text-primary" />
+              <input
+                type="text"
+                value={pair.right}
+                onChange={(event) => setPair(index, "right", event.target.value)}
+                placeholder={`Élément B${index + 1}`}
+                className="h-10 min-w-0 rounded-lg bg-muted/50 px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/20"
+              />
+              <button
+                type="button"
+                disabled={question.options.length <= 2}
+                onClick={() => removePair(index)}
+                className="mx-auto flex size-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-30"
+                aria-label={`Supprimer la paire ${index + 1}`}
+              >
+                <Trash2 className="size-4" />
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={addPair}
+            className="inline-flex h-9 items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 text-xs font-bold text-primary transition hover:bg-primary/10"
+          >
+            <Plus className="size-3.5" />
+            Ajouter une paire
+          </button>
+        </div>
+      ) : (
+        <div className="mt-4">
+          <p className="mb-2 text-xs text-muted-foreground">
+            {question.type === "qcu"
+              ? "Sélectionnez une seule bonne réponse."
+              : "Cochez toutes les bonnes réponses (au moins deux)."}
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {question.options.map((option, index) => {
+              const selected = question.correctAnswers.includes(index)
+              return (
+                <label
+                  key={index}
+                  className={`group flex cursor-pointer items-center gap-3 rounded-lg border bg-card p-3 transition ${
+                    selected
+                      ? "border-accent ring-2 ring-accent/15"
+                      : "border-border hover:border-primary/40"
+                  }`}
+                >
+                  <input
+                    type={question.type === "qcu" ? "radio" : "checkbox"}
+                    name={question.type === "qcu" ? (compact ? "modal-correct-answer" : "create-correct-answer") : undefined}
+                    checked={selected}
+                    onChange={() => toggleCorrectAnswer(index)}
+                    className="size-4 accent-[var(--accent)]"
+                  />
+                  <span className={`flex size-6 shrink-0 items-center justify-center rounded-md text-[11px] font-bold ${
+                    selected ? "bg-accent/15 text-accent" : "bg-muted text-muted-foreground"
+                  }`}>
+                    {String.fromCharCode(65 + index)}
+                  </span>
+                  <input
+                    type="text"
+                    value={option}
+                    onChange={(event) => setOption(index, event.target.value)}
+                    placeholder={`Option ${index + 1}`}
+                    className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/70"
+                  />
+                  {selected ? <Check className="size-4 shrink-0 text-accent" /> : null}
+                </label>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       <button
         type="button"
@@ -238,24 +458,40 @@ function QuestionList({ questions, onDelete, onEdit, dense = false }) {
 
   return (
     <div className="space-y-2.5">
-      {questions.map((question, index) => (
-        <div
-          key={question.id}
-          className={`group flex items-start gap-3 rounded-xl border border-border bg-card ${
-            dense ? "p-3" : "p-4"
-          } transition hover:border-primary/30 hover:shadow-sm`}
-        >
+      {questions.map((rawQuestion, index) => {
+        const question = normalizeQuestion(rawQuestion)
+        const typeLabel = QUESTION_TYPES.find((type) => type.value === question.type)?.label || "QCU"
+        const answerSummary = question.type === "liaison"
+          ? `${question.options.length} paire${question.options.length !== 1 ? "s" : ""} à associer`
+          : question.correctAnswers
+              .map((answer) => String.fromCharCode(65 + answer))
+              .join(", ")
+
+        return (
+          <div
+            key={question.id}
+            className={`group flex items-start gap-3 rounded-xl border border-border bg-card ${
+              dense ? "p-3" : "p-4"
+            } transition hover:border-primary/30 hover:shadow-sm`}
+          >
           <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-extrabold text-primary">
             {index + 1}
           </div>
           <div className="min-w-0 flex-1">
+            <span className="mb-1.5 inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">
+              {typeLabel}
+            </span>
             <p className="line-clamp-2 text-sm font-semibold leading-5 text-foreground">
               {question.statement}
             </p>
             <p className="mt-1.5 flex items-center gap-1.5 text-xs text-accent">
               <BadgeCheck className="size-3.5" />
-              Bonne réponse : {String.fromCharCode(65 + question.correctAnswer)} —{" "}
-              {question.options[question.correctAnswer]}
+              {question.type === "liaison"
+                ? "Associations : "
+                : question.type === "qcm"
+                  ? "Bonnes réponses : "
+                  : "Bonne réponse : "}
+              {answerSummary}
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-1">
@@ -280,8 +516,9 @@ function QuestionList({ questions, onDelete, onEdit, dense = false }) {
               <Trash2 className="size-4" />
             </button>
           </div>
-        </div>
-      ))}
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -289,12 +526,9 @@ function QuestionList({ questions, onDelete, onEdit, dense = false }) {
 function ExamModal({ exam, onClose, onSave, notify }) {
   const [draft, setDraft] = useState(() => ({
     ...exam,
-    questions: exam.questions.map((question) => ({
-      ...question,
-      options: [...question.options],
-    })),
+    questions: exam.questions.map(normalizeQuestion),
   }))
-  const [question, setQuestion] = useState({ ...EMPTY_QUESTION, options: ["", "", "", ""] })
+  const [question, setQuestion] = useState(createEmptyQuestion)
   const [editingQuestionId, setEditingQuestionId] = useState(null)
   const questionEditorRef = useRef(null)
 
@@ -311,16 +545,15 @@ function ExamModal({ exam, onClose, onSave, notify }) {
   }, [onClose])
 
   const saveQuestion = () => {
-    if (!question.statement.trim() || question.options.some((option) => !option.trim())) {
-      notify("Complétez l'énoncé et les quatre options avant d'enregistrer la question.", "error")
+    const validation = validateQuestion(question)
+    if (validation.error) {
+      notify(validation.error, "error")
       return
     }
 
     const savedQuestion = {
-      ...question,
+      ...validation.value,
       id: editingQuestionId || makeId("question"),
-      statement: question.statement.trim(),
-      options: question.options.map((option) => option.trim()),
     }
 
     setDraft((current) => ({
@@ -331,17 +564,14 @@ function ExamModal({ exam, onClose, onSave, notify }) {
           )
         : [...current.questions, savedQuestion],
     }))
-    setQuestion({ ...EMPTY_QUESTION, options: ["", "", "", ""] })
+    setQuestion(createEmptyQuestion())
     setEditingQuestionId(null)
     notify(editingQuestionId ? "La question a été modifiée." : "La question a été ajoutée.")
   }
 
   const startEditingQuestion = (questionToEdit) => {
     setEditingQuestionId(questionToEdit.id)
-    setQuestion({
-      ...questionToEdit,
-      options: [...questionToEdit.options],
-    })
+    setQuestion(normalizeQuestion(questionToEdit))
     window.requestAnimationFrame(() => {
       questionEditorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
     })
@@ -349,7 +579,7 @@ function ExamModal({ exam, onClose, onSave, notify }) {
 
   const cancelQuestionEditing = () => {
     setEditingQuestionId(null)
-    setQuestion({ ...EMPTY_QUESTION, options: ["", "", "", ""] })
+    setQuestion(createEmptyQuestion())
   }
 
   const save = () => {
@@ -370,7 +600,7 @@ function ExamModal({ exam, onClose, onSave, notify }) {
 
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-foreground/55 p-3 backdrop-blur-sm sm:p-6"
+      className="fixed inset-0 z-[10000] flex items-center justify-center bg-foreground/55 p-3 backdrop-blur-sm sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-labelledby="edit-exam-title"
@@ -621,7 +851,7 @@ export function ExamsManagement({ path, navigate }) {
   })
   const [showForm, setShowForm] = useState(false)
   const [examForm, setExamForm] = useState({ ...EMPTY_EXAM, questions: [] })
-  const [questionForm, setQuestionForm] = useState({ ...EMPTY_QUESTION, options: ["", "", "", ""] })
+  const [questionForm, setQuestionForm] = useState(createEmptyQuestion)
   const [editingExam, setEditingExam] = useState(null)
   const [notice, setNotice] = useState(null)
   const [sharedBackend, setSharedBackend] = useState(false)
@@ -668,12 +898,13 @@ export function ExamsManagement({ path, navigate }) {
 
   const resetCreateForm = () => {
     setExamForm({ ...EMPTY_EXAM, questions: [] })
-    setQuestionForm({ ...EMPTY_QUESTION, options: ["", "", "", ""] })
+    setQuestionForm(createEmptyQuestion())
   }
 
   const addQuestion = () => {
-    if (!questionForm.statement.trim() || questionForm.options.some((option) => !option.trim())) {
-      notify("Complétez l'énoncé et les quatre options avant d'ajouter la question.", "error")
+    const validation = validateQuestion(questionForm)
+    if (validation.error) {
+      notify(validation.error, "error")
       return
     }
     setExamForm((current) => ({
@@ -681,14 +912,12 @@ export function ExamsManagement({ path, navigate }) {
       questions: [
         ...current.questions,
         {
-          ...questionForm,
+          ...validation.value,
           id: makeId("question"),
-          statement: questionForm.statement.trim(),
-          options: questionForm.options.map((option) => option.trim()),
         },
       ],
     }))
-    setQuestionForm({ ...EMPTY_QUESTION, options: ["", "", "", ""] })
+    setQuestionForm(createEmptyQuestion())
     notify("Question ajoutée à l'examen.")
   }
 

@@ -1,376 +1,334 @@
-/**
- * PrintableFormateurTable.jsx
- *
- * Dedicated print component for the Formateur view.
- * Renders a single merged table (all units across all programmes)
- * in landscape orientation, WITHOUT the "Progression" column.
- *
- * Changes vs. original:
- *  - VHG column removed from print output (screen view unchanged)
- *  - Weeks with zero data across all units are filtered out
- *  - Week header shows the Monday date (DD/MM) instead of week number
- *  - Table borders strengthened for print rendering
- *  - Table rotated 90° clockwise via CSS class (handled in globals.css)
- *
- * Visibility: hidden on screen (`print-only` class), shown only during print.
- * The @page rule (landscape, margins) is declared in globals.css.
- */
+import { formatShortDate, getDominantWeekMonth } from '@/lib/logigramme-helpers';
 
-/**
- * Returns true if a cell object carries meaningful data worth printing.
- * Vacances, examens, TIFF/clôture, and normal sessions all qualify.
- * An absent cell (undefined/null) does not.
- */
 function isCellMeaningful(cell) {
   if (!cell) return false;
-  // Any typed cell (vacation, exam, tiff) is meaningful regardless of heures
   if (cell.cell_type && cell.cell_type !== 'normal') return true;
-  // A normal cell is meaningful only when heures is a positive number
-  return cell.cell_type === 'normal' && !!cell.heures && parseFloat(cell.heures) > 0;
+  return cell.cell_type === 'normal' && parseFloat(cell.heures) > 0;
 }
 
-/**
- * @param {object}  props
- * @param {string}  props.formateurNom    - Full name of the formateur
- * @param {object[]} props.unites         - Flat array of unite objects (all programmes merged)
- * @param {object[]} props.weeks          - Array of week objects { semaine, week_start_date }
- * @param {function} props.onContextMenu  - Optional right-click handler for cells
- */
-export function PrintableFormateurTable({ formateurNom, unites, weeks, onContextMenu }) {
-  if (!unites?.length || !weeks?.length) return null;
+function isCellDone(cell) {
+  return cell?.completion_status === 'done' || cell?.completion_status === 'auto_done';
+}
 
-  // Deduplicate by unite.id (safety net in case the same unite appears twice)
+function dedupeUnits(unites) {
   const seen = new Set();
-  const dedupedUnites = unites.filter((u) => {
-    if (seen.has(u.id)) return false;
-    seen.add(u.id);
+
+  return (unites || []).filter((unite, index) => {
+    const key = unite.id || `${unite.logigramme_id || 'unknown'}-${unite.nom || index}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
     return true;
   });
+}
 
-  // ── Point 3: Filter out weeks that are empty across ALL units ──────────────
-  // Pre-build cellMaps per unite for fast lookup
-  const cellMaps = dedupedUnites.map((u) => {
-    const map = {};
-    (u.cells || []).forEach((c) => { map[c.semaine] = c; });
-    return map;
+function groupUnitsByLogigramme(unites) {
+  const groups = new Map();
+
+  unites.forEach((unite) => {
+    const logigramme = unite.logigramme || {};
+    const key = unite.logigramme_id || logigramme.id || 'unknown';
+
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        meta: logigramme,
+        units: [],
+      });
+    }
+
+    groups.get(key).units.push(unite);
   });
 
-  const activeWeeks = weeks.filter((w) =>
-    w && cellMaps.some((map) => isCellMeaningful(map[w.semaine]))
-  );
+  return Array.from(groups.values());
+}
 
-  // Découpage en chunks de 16 semaines maximum
-  const MAX_WEEKS_PER_CHUNK = 16;
-  const weekChunks = [];
-  for (let i = 0; i < activeWeeks.length; i += MAX_WEEKS_PER_CHUNK) {
-    weekChunks.push(activeWeeks.slice(i, i + MAX_WEEKS_PER_CHUNK));
-  }
+function createCellMap(unite) {
+  return new Map((unite.cells || []).map((cell) => [String(cell.semaine), cell]));
+}
 
-  // Determine distinct programme labels for the header info line
-  const programmeLabels = [...new Set(
-    dedupedUnites.map((u) =>
-      u.logigramme
-        ? `${u.logigramme.filiere?.code ?? ''} – ${u.logigramme.classe?.label ?? ''}`
-        : '—'
-    )
-  )];
-
-  // Total VHG (kept in the document header text only, column removed)
-  const totalVhg = Number(dedupedUnites.reduce((sum, u) => sum + (parseFloat(u.vhg) || 0), 0).toFixed(1));
-
-  return (
-    /* print-only: hidden on screen, shown on print via globals.css */
-    <div className="print-only">
-      {weekChunks.map((chunk, chunkIndex) => {
-        // Calcul du fontSize basé sur la taille du chunk : plancher à 7pt, plafond à 9pt
-        const fontSize = `${Math.max(7, Math.min(9, 120 / Math.max(chunk.length, 10)))}pt`;
-        
-        return (
-          <div 
-            key={chunkIndex} 
-            style={{ 
-              // Au lieu de forcer un saut de page avant chaque chunk (qui gaspille de l'espace),
-              // on laisse le flux gérer la pagination et on évite de couper un chunk au milieu.
-              pageBreakInside: 'avoid',
-              breakInside: 'avoid',
-              marginBottom: '20px'
-            }}
-          >
-            {/* ── Document Header (répété par chunk) ──────────────────────────────────────────────── */}
-            <div style={{ marginBottom: '6px', borderBottom: '2px solid #1e3a6e', paddingBottom: '4px' }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '16px' }}>
-                <h1 style={{
-                  fontSize: dedupedUnites.length > 15 ? '9pt' : '12pt',
-                  fontWeight: 900,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.15em',
-                  color: '#1e3a6e',
-                  margin: 0
-                }}>
-                  Plan de Formation {weekChunks.length > 1 ? `(Partie ${chunkIndex + 1}/${weekChunks.length})` : ''}
-                </h1>
-                <span style={{ fontSize: dedupedUnites.length > 15 ? '8pt' : '9pt', fontWeight: 700, color: '#374151' }}>
-                  Formateur : {formateurNom}
-                </span>
-              </div>
-              <p style={{ fontSize: '6.5pt', color: '#6b7280', marginTop: '2px', marginBottom: 0 }}>
-                {programmeLabels.join('  |  ')} &nbsp;—&nbsp;
-                <strong>{dedupedUnites.length} unités</strong> &nbsp;—&nbsp;
-                <strong>{totalVhg} h VHG total</strong> &nbsp;—&nbsp;
-                <strong>Période : {getMonthName(chunk[0]?.week_start_date)} à {getMonthName(chunk[chunk.length - 1]?.week_start_date)}</strong>
-              </p>
-            </div>
-
-            {/* ── Table du chunk ─────────────────────────────────────────────────── */}
-            <table style={{
-              width: '100%',
-              borderCollapse: 'collapse',
-              tableLayout: 'fixed',
-              fontSize: fontSize,
-              fontFamily: 'Figtree, ui-sans-serif, system-ui, sans-serif',
-            }}>
-              <colgroup>
-                {/* Programme column — fixed ~10% */}
-                <col style={{ width: '10%' }} />
-                {/* Unité de formation — fixed ~18% */}
-                <col style={{ width: '18%' }} />
-                {/* One col per ACTIVE week in the chunk */}
-                {chunk.map((w) => (
-                  <col key={w?.semaine || Math.random()} style={{ width: `${72 / Math.max(chunk.length, 1)}%` }} />
-                ))}
-              </colgroup>
-
-              <thead>
-                <tr>
-                  <th
-                    colSpan={2}
-                    style={{
-                      backgroundColor: '#FFE600',
-                      color: '#000',
-                      fontWeight: 900,
-                      fontSize: '8pt',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.2em',
-                      textAlign: 'center',
-                      border: '2px solid #1e3a6e',
-                      padding: '3px 5px',
-                      verticalAlign: 'middle',
-                    }}
-                  >
-                    Plan de formation
-                  </th>
-                  <MonthHeaders weeks={chunk} />
-                </tr>
-                <tr style={{ backgroundColor: '#f0f4f8' }}>
-                  <th style={thStyle}>Programme</th>
-                  <th style={{ ...thStyle, textAlign: 'left' }}>Unité de formation</th>
-                  {chunk.map((w) => (
-                    <th key={w?.semaine || Math.random()} style={{ ...thStyle, fontSize: '6pt' }}>
-                      {getMondayLabel(w)}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-
-              <tbody>
-                {dedupedUnites.map((unite, idx) => {
-                  const weekMap = cellMaps[idx];
-                  const programmeName = unite.logigramme
-                    ? `${unite.logigramme.filiere?.code ?? ''} ${unite.logigramme.classe?.label ?? ''}`
-                    : '—';
-
-                  return (
-                    <tr
-                      key={unite.id}
-                      style={{
-                        backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc',
-                        pageBreakInside: 'avoid',
-                        breakInside: 'avoid',
-                      }}
-                    >
-                      <td style={{ ...tdStyle, fontSize: '5.5pt', fontWeight: 700, color: '#1e3a6e' }}>
-                        {programmeName}
-                      </td>
-                      <td style={{ ...tdStyle, textAlign: 'left', fontWeight: 700, maxWidth: '138px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}
-                        title={unite.nom}>
-                        {unite.nom}
-                      </td>
-                      {chunk.map((w) => {
-                        const cell = w ? weekMap[w.semaine] : null;
-                        return (
-                          <td
-                            key={w?.semaine || Math.random()}
-                            onContextMenu={onContextMenu ? (e) => onContextMenu(e, unite, w?.semaine, cell) : undefined}
-                            style={{
-                              ...tdStyle,
-                              textAlign: 'center',
-                              backgroundColor: getCellColor(cell),
-                              fontSize: 'inherit', /* Inherits dynamic size from table */
-                              fontWeight: cell?.heures ? 800 : 400,
-                              padding: '2px 1px',
-                            }}
-                          >
-                            {cell?.heures ? cell.heures : ''}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-
-            {/* ── Legend (print version — compact) ─────────────────────────────── */}
-            <div style={{
-              display: 'flex',
-              gap: '12px',
-              marginTop: '6px',
-              flexWrap: 'wrap',
-              fontSize: '6.5pt',
-              color: '#374151',
-            }}>
-              <LegendItem color="#FEF9C3" label="Session normale" />
-              <LegendItem color="#BBF7D0" label="Terminé" />
-              <LegendItem color="#F472B6" label="Vacance" />
-              <LegendItem color="#e2e8f0" label="Examen" />
-              <LegendItem color="#facc15" label="TIFF / Clôture" />
-            </div>
-          </div>
-        );
-      })}
-    </div>
+function getActiveWeeks(weeks, cellMaps) {
+  return (weeks || []).filter((week) =>
+    week && cellMaps.some((cellMap) => isCellMeaningful(cellMap.get(String(week.semaine))))
   );
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-/** Renders the month-spanning header cells for (filtered) week columns */
-function MonthHeaders({ weeks }) {
-  // Group consecutive weeks by month name
+function getMonthGroups(weeks) {
   const groups = [];
-  weeks.forEach((w) => {
-    if (!w) return;
-    const month = getMonthName(w.week_start_date);
-    const last = groups[groups.length - 1];
-    if (last && last.month === month) {
-      last.count++;
+
+  weeks.forEach((week) => {
+    const month = getDominantWeekMonth(week) || '—';
+    const current = groups[groups.length - 1];
+
+    if (current?.label === month) {
+      current.count += 1;
     } else {
-      groups.push({ month, count: 1 });
+      groups.push({
+        key: `${month}-${week.semaine}`,
+        label: month,
+        count: 1,
+      });
     }
   });
 
-  return groups.map((g, i) => (
-    <th
-      key={i}
-      colSpan={g.count}
-      style={{
-        backgroundColor: '#dbeafe',
-        color: '#1e3a6e',
-        fontWeight: 800,
-        fontSize: '7pt',
-        textTransform: 'uppercase',
-        letterSpacing: '0.08em',
-        textAlign: 'center',
-        border: '2px solid #1e3a6e',
-        padding: '3px 2px',
-        verticalAlign: 'middle',
-      }}
-    >
-      {g.month}
-    </th>
-  ));
+  return groups;
 }
 
-function LegendItem({ color, label }) {
+const SHORT_MONTH_LABELS = {
+  janvier: 'JAN.',
+  février: 'FÉV.',
+  mars: 'MAR.',
+  avril: 'AVR.',
+  mai: 'MAI',
+  juin: 'JUIN',
+  juillet: 'JUIL.',
+  août: 'AOÛT',
+  septembre: 'SEPT.',
+  octobre: 'OCT.',
+  novembre: 'NOV.',
+  décembre: 'DÉC.',
+};
+
+function getPrintableMonthLabel(month) {
+  if (month.count >= 4) return month.label;
+  return SHORT_MONTH_LABELS[month.label.toLocaleLowerCase('fr-FR')] || month.label;
+}
+
+function getProgrammeDetails(meta) {
+  return {
+    code: meta?.filiere?.code || '—',
+    name: meta?.filiere?.name || 'Programme inconnu',
+    classe: meta?.classe?.label || 'Classe non renseignée',
+  };
+}
+
+function getUnitProgress(unite) {
+  const trackableCells = (unite.cells || []).filter(
+    (cell) => cell.cell_type === 'normal' || cell.cell_type === 'exam'
+  );
+  const completedCells = trackableCells.filter(isCellDone).length;
+  const percentage = trackableCells.length > 0
+    ? Math.round((completedCells / trackableCells.length) * 100)
+    : 0;
+
+  return {
+    completedCells,
+    totalCells: trackableCells.length,
+    percentage,
+    realisedHours: Number(parseFloat(unite.vh_realise || 0).toFixed(1)),
+  };
+}
+
+function getCellLabel(cell) {
+  if (!cell) return '';
+
+  if (cell.cell_type === 'vacation') return 'V';
+  if (cell.cell_type === 'exam') return isCellDone(cell) ? 'E ✓' : 'E';
+  if (cell.cell_type === 'tiff') return 'T';
+
+  if (cell.cell_type === 'normal') {
+    const hours = cell.heures !== null && cell.heures !== undefined
+      ? Number(cell.heures)
+      : '';
+    return isCellDone(cell) ? `${hours} ✓` : hours;
+  }
+
+  return '';
+}
+
+function getCellClassName(cell) {
+  if (!cell) return 'print-schedule-cell print-schedule-cell--empty';
+  if (cell.cell_type === 'vacation') return 'print-schedule-cell print-schedule-cell--vacation';
+  if (cell.cell_type === 'exam') return 'print-schedule-cell print-schedule-cell--exam';
+  if (cell.cell_type === 'tiff') return 'print-schedule-cell print-schedule-cell--tiff';
+  if (cell.cell_type === 'normal' && isCellDone(cell)) {
+    return 'print-schedule-cell print-schedule-cell--done';
+  }
+  return 'print-schedule-cell print-schedule-cell--normal';
+}
+
+function PrintLegendItem({ className, label }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-      <div style={{
-        width: '9px',
-        height: '9px',
-        backgroundColor: color,
-        border: '1px solid #374151',
-        borderRadius: '2px',
-        flexShrink: 0,
-      }} />
+    <div className="print-logigramme-legend-item">
+      <span className={`print-logigramme-legend-swatch ${className}`} />
       <span>{label}</span>
     </div>
   );
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+function ProgrammePrintTable({ group, weeks, programmeIndex, formateurNom }) {
+  const details = getProgrammeDetails(group.meta);
+  const cellMaps = group.units.map(createCellMap);
+  const activeWeeks = getActiveWeeks(weeks, cellMaps);
+  const monthGroups = getMonthGroups(activeWeeks);
+  const programmeVhg = Number(
+    group.units.reduce((sum, unit) => sum + (parseFloat(unit.vhg) || 0), 0).toFixed(1)
+  );
+  const weekWidth = activeWeeks.length > 0 ? 58 / activeWeeks.length : 0;
 
-function getCellColor(cell) {
-  if (!cell) return 'transparent';
-  const isDone = cell.completion_status === 'done' || cell.completion_status === 'auto_done';
-  switch (cell.cell_type) {
-    case 'vacation':  return '#F472B6';
-    case 'exam':
-      // Pending = slightly darker soft red; Done = deep teal-green (distinct from normal done mint)
-      return isDone ? '#134e3a' : '#fca5a5';
-    case 'tiff':      return '#facc15';
-    case 'normal':
-      if (isDone) {
-        return '#BBF7D0';
-      }
-      return '#FEF9C3';
-    default:          return 'transparent';
-  }
+  return (
+    <section className="print-logigramme-programme">
+      <header className="print-logigramme-programme-header">
+        <div className="print-logigramme-programme-identity">
+          <span className="print-logigramme-programme-index">{String(programmeIndex + 1).padStart(2, '0')}</span>
+          <span className="print-logigramme-programme-code">{details.code}</span>
+          <div>
+            <h2>{details.name}</h2>
+            <p>{details.classe} · Formateur : {formateurNom}</p>
+          </div>
+        </div>
+        <div className="print-logigramme-programme-stats">
+          <span><strong>{group.units.length}</strong> unités</span>
+          <span><strong>{programmeVhg}</strong> h VHG</span>
+          <span><strong>{activeWeeks.length}</strong> semaines planifiées</span>
+        </div>
+      </header>
+
+      <div className="print-logigramme-table-frame">
+        <table className={`print-logigramme-table ${activeWeeks.length > 28 ? 'is-dense' : ''}`}>
+          <colgroup>
+            <col style={{ width: '4%' }} />
+            <col style={{ width: '22%' }} />
+            <col style={{ width: '6%' }} />
+            {activeWeeks.map((week) => (
+              <col key={`col-${week.semaine}`} style={{ width: `${weekWidth}%` }} />
+            ))}
+            <col style={{ width: '10%' }} />
+          </colgroup>
+
+          <thead>
+            <tr>
+              <th className="print-logigramme-plan-title" colSpan={3}>Plan de formation</th>
+              {monthGroups.map((month) => (
+                <th
+                  key={month.key}
+                  className="print-logigramme-month"
+                  colSpan={month.count}
+                >
+                  {getPrintableMonthLabel(month)}
+                </th>
+              ))}
+              <th className="print-logigramme-progress-heading" rowSpan={3}>Progression</th>
+            </tr>
+            <tr>
+              <th className="print-logigramme-fixed-heading" rowSpan={2}>N°</th>
+              <th className="print-logigramme-fixed-heading print-logigramme-unit-heading" rowSpan={2}>
+                Unité de formation
+              </th>
+              <th className="print-logigramme-fixed-heading" rowSpan={2}>VHG</th>
+              {activeWeeks.map((week) => (
+                <th key={`week-${week.semaine}`} className="print-logigramme-week-number">
+                  {week.semaine}
+                </th>
+              ))}
+            </tr>
+            <tr>
+              {activeWeeks.map((week) => (
+                <th key={`date-${week.semaine}`} className="print-logigramme-week-date">
+                  {formatShortDate(week.week_start_date)}
+                </th>
+              ))}
+            </tr>
+          </thead>
+
+          <tbody>
+            {group.units.map((unite, unitIndex) => {
+              const progress = getUnitProgress(unite);
+              const cellMap = cellMaps[unitIndex];
+
+              return (
+                <tr key={unite.id || `${group.key}-${unitIndex}`}>
+                  <td className="print-logigramme-row-number">{unitIndex + 1}</td>
+                  <td className="print-logigramme-unit-name">{unite.nom}</td>
+                  <td className="print-logigramme-vhg">{unite.vhg}</td>
+                  {activeWeeks.map((week) => {
+                    const cell = cellMap.get(String(week.semaine));
+                    return (
+                      <td
+                        key={`${unite.id || unitIndex}-${week.semaine}`}
+                        className={getCellClassName(cell)}
+                      >
+                        {getCellLabel(cell)}
+                      </td>
+                    );
+                  })}
+                  <td className="print-logigramme-progress-cell">
+                    <div className="print-logigramme-progress-value">
+                      <span>{progress.realisedHours}h / {unite.vhg}h</span>
+                      <strong>{progress.percentage}%</strong>
+                    </div>
+                    <div className="print-logigramme-progress-caption">
+                      {progress.completedCells}/{progress.totalCells} cellules
+                    </div>
+                    <div className="print-logigramme-progress-track">
+                      <span
+                        className={progress.percentage >= 100 ? 'is-complete' : ''}
+                        style={{ width: `${Math.min(progress.percentage, 100)}%` }}
+                      />
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
 }
 
-const MONTHS_FR = [
-  'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
-  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
-];
+export function PrintableFormateurTable({ formateurNom, unites, weeks }) {
+  if (!unites?.length || !weeks?.length) return null;
 
-function getMonthName(dateStr) {
-  if (!dateStr) return '—';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return '—';
-  return MONTHS_FR[d.getMonth()] || '—';
+  const dedupedUnits = dedupeUnits(unites);
+  const programmeGroups = groupUnitsByLogigramme(dedupedUnits);
+  const totalVhg = Number(
+    dedupedUnits.reduce((sum, unite) => sum + (parseFloat(unite.vhg) || 0), 0).toFixed(1)
+  );
+
+  return (
+    <div className="print-only print-logigramme-document">
+      <header className="print-logigramme-document-header">
+        <div className="print-logigramme-brand">
+          <div className="print-logigramme-brand-mark">ESFPP</div>
+          <div>
+            <h1>Plan de formation</h1>
+            <p>Vue consolidée du formateur</p>
+          </div>
+        </div>
+
+        <div className="print-logigramme-professor">
+          <span>Formateur</span>
+          <strong>{formateurNom}</strong>
+        </div>
+      </header>
+
+      <div className="print-logigramme-summary">
+        <div><strong>{programmeGroups.length}</strong><span>Logigrammes</span></div>
+        <div><strong>{dedupedUnits.length}</strong><span>Unités de formation</span></div>
+        <div><strong>{totalVhg} h</strong><span>Volume global</span></div>
+        <p>Chaque filière et classe est présentée séparément pour préserver la structure pédagogique.</p>
+      </div>
+
+      {programmeGroups.map((group, index) => (
+        <ProgrammePrintTable
+          key={group.key}
+          group={group}
+          weeks={weeks}
+          programmeIndex={index}
+          formateurNom={formateurNom}
+        />
+      ))}
+
+      <footer className="print-logigramme-footer">
+        <div className="print-logigramme-legend">
+          <PrintLegendItem className="print-schedule-cell--normal" label="Session normale" />
+          <PrintLegendItem className="print-schedule-cell--done" label="Terminé" />
+          <PrintLegendItem className="print-schedule-cell--vacation" label="Vacance" />
+          <PrintLegendItem className="print-schedule-cell--exam" label="Examen" />
+          <PrintLegendItem className="print-schedule-cell--tiff" label="TIFF / Clôture" />
+        </div>
+        <span>ESFPP · Suivi pédagogique</span>
+      </footer>
+    </div>
+  );
 }
-
-/**
- * Point 4: Returns the Monday date as "DD/MM" for a week object.
- * Uses week_start_date when available, otherwise falls back to the
- * semaine identifier (which may itself be a date string or week number).
- */
-function getMondayLabel(week) {
-  if (!week) return '—';
-  // Prefer the explicit week_start_date field
-  const src = week.week_start_date || week.semaine;
-  if (!src) return week.semaine ?? '—';
-
-  // Try parsing as a date
-  const d = new Date(src);
-  if (!isNaN(d.getTime())) {
-    const day = String(d.getDate()).padStart(2, '0');
-    return day; // Day-only number to fit wide printable grid
-  }
-
-  // Fallback: return as-is (e.g. "S36")
-  return String(src);
-}
-
-// ── Shared cell styles (plain JS objects — no Tailwind needed here) ──────────
-
-// Point 5: borders use solid black for guaranteed print rendering
-const thStyle = {
-  backgroundColor: '#f0f4f8',
-  color: '#0f172a',
-  fontWeight: 800,
-  fontSize: '6.5pt',
-  textTransform: 'uppercase',
-  letterSpacing: '0.04em',
-  textAlign: 'center',
-  border: '1.5px solid #334155',   // stronger border for print
-  padding: '3px 2px',
-  verticalAlign: 'middle',
-};
-
-const tdStyle = {
-  border: '1px solid #475569',     // stronger than #cbd5e1 for print
-  padding: '2px 2px',
-  verticalAlign: 'middle',
-  fontSize: '6.5pt',
-  color: '#0f172a',
-};

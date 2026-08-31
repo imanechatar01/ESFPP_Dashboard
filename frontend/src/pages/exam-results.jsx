@@ -6,6 +6,7 @@ import {
   ChevronDown,
   FileCheck2,
   Loader2,
+  Printer,
   Search,
   Trash2,
   UserRound,
@@ -26,6 +27,151 @@ function formatDate(value) {
   }).format(new Date(value))
 }
 
+function formatExamDate(value) {
+  if (!value) return "—"
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(`${value}T12:00:00`))
+}
+
+function PrintableAllExamResults({ students }) {
+  if (!students.length) return null
+
+  const exams = students.flatMap((student) => student.exams)
+  const passedCount = exams.filter((exam) => exam.passed).length
+  const average = exams.length
+    ? Math.round(exams.reduce((sum, exam) => sum + Number(exam.percentage || 0), 0) / exams.length)
+    : 0
+
+  return (
+    <section className="print-only print-exam-report">
+      <div className="print-exam-report-heading">
+        <div className="print-exam-report-brand">
+          <div className="print-exam-report-mark">ESFPP</div>
+          <div>
+            <h1>Relevé global des résultats d&apos;examens</h1>
+            <p>École des Sciences Infirmières — Mohammedia</p>
+          </div>
+        </div>
+        <div className="print-exam-report-meta">
+          <span>Document académique · {students.length} étudiant(s)</span>
+          <strong>{new Intl.DateTimeFormat("fr-FR").format(new Date())}</strong>
+        </div>
+      </div>
+
+      <div className="print-exam-summary">
+        <div><strong>{students.length}</strong><span>Étudiants</span></div>
+        <div><strong>{exams.length}</strong><span>Examens finaux</span></div>
+        <div><strong>{passedCount}</strong><span>Validés</span></div>
+        <div><strong>{average}%</strong><span>Moyenne globale</span></div>
+      </div>
+
+      {students.map((student, index) => {
+        const studentPassedCount = student.exams.filter((exam) => exam.passed).length
+        const studentAverage = student.exams.length
+          ? Math.round(
+              student.exams.reduce((sum, exam) => sum + Number(exam.percentage || 0), 0) /
+                student.exams.length,
+            )
+          : 0
+
+        return (
+          <section className="print-exam-student-section" key={student.id}>
+            <div className="print-exam-student-card">
+              <div>
+                <span>Étudiant {index + 1}</span>
+                <strong>{student.name}</strong>
+              </div>
+              <div>
+                <span>Email académique</span>
+                <strong>{student.email || "—"}</strong>
+              </div>
+              <div className="print-exam-student-totals">
+                <span>{student.exams.length} examen(s) · {studentPassedCount} validé(s)</span>
+                <strong>{studentAverage}%</strong>
+              </div>
+            </div>
+
+            <table className="print-exam-results-table">
+              <thead>
+                <tr>
+                  <th>Examen</th>
+                  <th>Date prévue</th>
+                  <th>Tentative</th>
+                  <th>Score</th>
+                  <th>Note</th>
+                  <th>Résultat</th>
+                  <th>Soumis le</th>
+                </tr>
+              </thead>
+              <tbody>
+                {student.exams.map((exam) => (
+                  <tr key={exam.id}>
+                    <td>{exam.examTitle}</td>
+                    <td>{formatExamDate(exam.examDate)}</td>
+                    <td>N° {exam.attemptNumber}</td>
+                    <td>{exam.score}/{exam.totalQuestions}</td>
+                    <td className="print-exam-percentage">{Math.round(Number(exam.percentage || 0))}%</td>
+                    <td>
+                      <span className={exam.passed ? "is-passed" : "is-failed"}>
+                        {exam.passed ? "Validé" : "Non validé"}
+                      </span>
+                    </td>
+                    <td>{formatDate(exam.submittedAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        )
+      })}
+
+      <div className="print-exam-report-footer">
+        <p>La meilleure note est conservée lorsque deux tentatives ont été utilisées.</p>
+        <p>Document généré automatiquement par ESFPP Dashboard.</p>
+      </div>
+    </section>
+  )
+}
+
+function groupResultsByStudent(results, searchTerm = "", statusFilter = "all") {
+  const term = searchTerm.trim().toLowerCase()
+  const grouped = new Map()
+
+  for (const result of results) {
+    const matchesTerm =
+      !term ||
+      result.studentName?.toLowerCase().includes(term) ||
+      result.studentEmail?.toLowerCase().includes(term) ||
+      result.examTitle?.toLowerCase().includes(term)
+    const matchesStatus =
+      statusFilter === "all" ||
+      (statusFilter === "passed" && result.passed) ||
+      (statusFilter === "failed" && !result.passed)
+
+    if (!matchesTerm || !matchesStatus) continue
+
+    if (!grouped.has(result.studentId)) {
+      grouped.set(result.studentId, {
+        id: result.studentId,
+        name: result.studentName,
+        email: result.studentEmail,
+        exams: [],
+      })
+    }
+    grouped.get(result.studentId).exams.push(result)
+  }
+
+  return [...grouped.values()]
+    .map((student) => ({
+      ...student,
+      exams: student.exams.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt)),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, "fr"))
+}
+
 export function ExamResults({ path, navigate }) {
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(true)
@@ -34,6 +180,27 @@ export function ExamResults({ path, navigate }) {
   const [statusFilter, setStatusFilter] = useState("all")
   const [expandedStudentId, setExpandedStudentId] = useState(null)
   const [deletingStudentId, setDeletingStudentId] = useState(null)
+  const [printingAllResults, setPrintingAllResults] = useState(false)
+
+  useEffect(() => {
+    if (!printingAllResults) return undefined
+
+    const previousTitle = document.title
+    document.title = "Releve-global-resultats-etudiants"
+
+    const finishPrinting = () => {
+      document.title = previousTitle
+      setPrintingAllResults(false)
+    }
+    window.addEventListener("afterprint", finishPrinting, { once: true })
+    const printFrame = window.requestAnimationFrame(() => window.print())
+
+    return () => {
+      window.cancelAnimationFrame(printFrame)
+      window.removeEventListener("afterprint", finishPrinting)
+      document.title = previousTitle
+    }
+  }, [printingAllResults])
 
   useEffect(() => {
     let active = true
@@ -54,41 +221,11 @@ export function ExamResults({ path, navigate }) {
     }
   }, [])
 
-  const students = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase()
-    const grouped = new Map()
-
-    for (const result of results) {
-      const matchesTerm =
-        !term ||
-        result.studentName?.toLowerCase().includes(term) ||
-        result.studentEmail?.toLowerCase().includes(term) ||
-        result.examTitle?.toLowerCase().includes(term)
-      const matchesStatus =
-        statusFilter === "all" ||
-        (statusFilter === "passed" && result.passed) ||
-        (statusFilter === "failed" && !result.passed)
-
-      if (!matchesTerm || !matchesStatus) continue
-
-      if (!grouped.has(result.studentId)) {
-        grouped.set(result.studentId, {
-          id: result.studentId,
-          name: result.studentName,
-          email: result.studentEmail,
-          exams: [],
-        })
-      }
-      grouped.get(result.studentId).exams.push(result)
-    }
-
-    return [...grouped.values()]
-      .map((student) => ({
-        ...student,
-        exams: student.exams.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt)),
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name, "fr"))
-  }, [results, searchTerm, statusFilter])
+  const students = useMemo(
+    () => groupResultsByStudent(results, searchTerm, statusFilter),
+    [results, searchTerm, statusFilter],
+  )
+  const allStudents = useMemo(() => groupResultsByStudent(results), [results])
 
   const stats = useMemo(() => {
     const studentCount = new Set(results.map((result) => result.studentId)).size
@@ -136,6 +273,10 @@ export function ExamResults({ path, navigate }) {
     }
   }
 
+  const printAllStudentResults = () => {
+    setPrintingAllResults(true)
+  }
+
   return (
     <DashboardShell
       title="Notes des étudiants"
@@ -162,14 +303,23 @@ export function ExamResults({ path, navigate }) {
         </section>
 
         <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-          <div className="flex flex-col gap-3 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 border-b border-border p-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h2 className="text-base font-bold text-foreground">Résultats par étudiant</h2>
               <p className="mt-1 text-xs text-muted-foreground">
                 Une seule fiche par étudiant. Cliquez dessus pour consulter ses examens.
               </p>
             </div>
-            <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center lg:flex-nowrap">
+              <button
+                type="button"
+                onClick={printAllStudentResults}
+                disabled={!allStudents.length}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-xs font-bold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Printer className="size-4" />
+                Imprimer tous les résultats
+              </button>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <input
@@ -252,19 +402,21 @@ export function ExamResults({ path, navigate }) {
                               La meilleure note est conservée lorsque deux tentatives ont été utilisées.
                             </p>
                           </div>
-                          <button
-                            type="button"
-                            disabled={deletingStudentId === student.id}
-                            onClick={() => deleteStudentResults(student)}
-                            className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-destructive/20 bg-destructive/5 px-3 text-[10px] font-bold text-destructive transition hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
+                          <div className="flex flex-col gap-2 sm:flex-row">
+                            <button
+                              type="button"
+                              disabled={deletingStudentId === student.id}
+                              onClick={() => deleteStudentResults(student)}
+                              className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-destructive/20 bg-destructive/5 px-3 text-[10px] font-bold text-destructive transition hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
                             {deletingStudentId === student.id ? (
                               <Loader2 className="size-3.5 animate-spin" />
                             ) : (
                               <Trash2 className="size-3.5" />
                             )}
                             Supprimer ses résultats
-                          </button>
+                            </button>
+                          </div>
                         </div>
                         <div className="overflow-x-auto rounded-xl border border-border bg-card">
                           <table className="w-full min-w-[760px] text-left">
@@ -315,6 +467,8 @@ export function ExamResults({ path, navigate }) {
             </div>
           )}
         </section>
+
+        {printingAllResults && <PrintableAllExamResults students={allStudents} />}
       </div>
     </DashboardShell>
   )

@@ -195,7 +195,7 @@ export function AccountManagement({ path, navigate }) {
       activePath={path}
       navigate={navigate}
     >
-      <div className="grid gap-8 lg:grid-cols-[380px_1fr] items-start">
+      <div className="grid items-start gap-8 lg:h-[calc(100dvh-8rem)] lg:min-h-0 lg:grid-cols-[380px_1fr]">
         {/* Panel 1: Nouvelle invitation */}
         <section className="rounded-2xl border border-border bg-card p-6 shadow-sm flex flex-col gap-6">
           <div className="flex items-center gap-3">
@@ -264,7 +264,7 @@ export function AccountManagement({ path, navigate }) {
         </section>
 
         {/* Panel 2: Annuaire des comptes */}
-        <section className="min-w-0 rounded-2xl border border-border bg-card p-6 shadow-sm flex flex-col">
+        <section className="flex min-h-0 min-w-0 flex-col rounded-2xl border border-border bg-card p-6 shadow-sm lg:h-full">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-3">
               <div className="flex items-center justify-center size-10 rounded-full bg-accent/10 text-accent border border-accent/20">

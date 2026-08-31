@@ -296,7 +296,6 @@ export function FormateurVue({ formateurId }) {
         formateurNom={formateurNom}
         unites={unites}
         weeks={weeks}
-        onContextMenu={handleCellContextMenu}
       />
 
       {/* ── Info Banner ─────────────────────────────────────────────────── */}

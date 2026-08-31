@@ -66,6 +66,40 @@ function formatTime(totalSeconds) {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
 }
 
+function getQuestionType(question) {
+  return ["qcu", "qcm", "liaison"].includes(question?.type) ? question.type : "qcu"
+}
+
+function getCorrectAnswers(question) {
+  if (Array.isArray(question?.correctAnswers)) return question.correctAnswers.map(Number)
+  return question?.correctAnswer == null ? [] : [Number(question.correctAnswer)]
+}
+
+function isQuestionCorrect(question, answer) {
+  const type = getQuestionType(question)
+  const expected = getCorrectAnswers(question)
+
+  if (type === "qcu") return Number(answer) === expected[0]
+  if (!Array.isArray(answer) || answer.length !== expected.length) return false
+
+  const normalizedAnswer = answer.map(Number)
+  if (type === "qcm") {
+    const selected = [...new Set(normalizedAnswer)].sort((a, b) => a - b)
+    const correct = [...new Set(expected)].sort((a, b) => a - b)
+    return selected.length === correct.length && selected.every((value, index) => value === correct[index])
+  }
+
+  return normalizedAnswer.every((value, index) => value === expected[index])
+}
+
+function isAnswerComplete(question, answer) {
+  const type = getQuestionType(question)
+  if (type === "qcu") return Number.isInteger(answer)
+  if (!Array.isArray(answer)) return false
+  if (type === "qcm") return answer.length > 0
+  return answer.length === question.options.length && answer.every(Number.isInteger)
+}
+
 function Brand() {
   return (
     <div className="flex items-center justify-center gap-2.5">
@@ -187,6 +221,68 @@ function ExamHeader({ exam, currentIndex, totalQuestions, timeLeft }) {
 }
 
 function QuestionCard({ question, index, selectedAnswer, onAnswer }) {
+  const type = getQuestionType(question)
+
+  if (type === "liaison") {
+    const rightOptions = question.options
+      .map((pair, optionIndex) => ({ value: optionIndex, label: pair.right }))
+      .reverse()
+
+    return (
+      <section
+        className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-8"
+        aria-labelledby={`question-title-${question.id}`}
+      >
+        <div className="flex items-start gap-4">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-sm font-bold text-primary">
+            {index + 1}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">Liaison</p>
+            <h2 id={`question-title-${question.id}`} className="mt-2 text-base font-semibold leading-relaxed text-foreground sm:text-lg">
+              {question.statement}
+            </h2>
+          </div>
+        </div>
+
+        <div className="mt-7 space-y-3">
+          {question.options.map((pair, pairIndex) => (
+            <div key={pairIndex} className="grid items-center gap-3 rounded-xl border border-border bg-muted/30 p-3 sm:grid-cols-[1fr_auto_1fr]">
+              <div className="rounded-lg bg-card px-3 py-2.5 text-sm font-semibold text-foreground">
+                {pair.left}
+              </div>
+              <ArrowRight className="mx-auto size-4 text-primary" />
+              <select
+                value={selectedAnswer?.[pairIndex] ?? ""}
+                onChange={(event) => {
+                  const nextAnswer = Array.isArray(selectedAnswer)
+                    ? [...selectedAnswer]
+                    : Array(question.options.length).fill(null)
+                  nextAnswer[pairIndex] = event.target.value === "" ? null : Number(event.target.value)
+                  onAnswer(nextAnswer)
+                }}
+                className="h-10 rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus:border-primary focus:ring-4 focus:ring-primary/15"
+              >
+                <option value="">Choisir l'élément associé</option>
+                {rightOptions.map((option) => (
+                  <option
+                    key={option.value}
+                    value={option.value}
+                    disabled={selectedAnswer?.some(
+                      (answer, answerIndex) => answerIndex !== pairIndex && answer === option.value,
+                    )}
+                  >
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ))}
+        </div>
+      </section>
+    )
+  }
+
   return (
     <section
       className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-8"
@@ -198,7 +294,7 @@ function QuestionCard({ question, index, selectedAnswer, onAnswer }) {
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
-            Question {index + 1}
+            {type === "qcm" ? "QCM — plusieurs réponses" : `Question ${index + 1}`}
           </p>
           <h2
             id={`question-title-${question.id}`}
@@ -210,9 +306,13 @@ function QuestionCard({ question, index, selectedAnswer, onAnswer }) {
       </div>
 
       <fieldset className="mt-7 space-y-3">
-        <legend className="sr-only">Choisissez une réponse</legend>
+        <legend className="sr-only">
+          {type === "qcm" ? "Choisissez toutes les bonnes réponses" : "Choisissez une réponse"}
+        </legend>
         {question.options.map((option, optionIndex) => {
-          const selected = selectedAnswer === optionIndex
+          const selected = type === "qcm"
+            ? Array.isArray(selectedAnswer) && selectedAnswer.includes(optionIndex)
+            : selectedAnswer === optionIndex
           return (
             <label
               key={`${question.id}-${optionIndex}`}
@@ -223,10 +323,21 @@ function QuestionCard({ question, index, selectedAnswer, onAnswer }) {
               }`}
             >
               <input
-                type="radio"
+                type={type === "qcm" ? "checkbox" : "radio"}
                 name={`answer-${question.id}`}
                 checked={selected}
-                onChange={() => onAnswer(optionIndex)}
+                onChange={() => {
+                  if (type === "qcu") {
+                    onAnswer(optionIndex)
+                    return
+                  }
+                  const current = Array.isArray(selectedAnswer) ? selectedAnswer : []
+                  onAnswer(
+                    selected
+                      ? current.filter((answer) => answer !== optionIndex)
+                      : [...current, optionIndex].sort((a, b) => a - b),
+                  )
+                }}
                 className="sr-only"
               />
               <span
@@ -254,7 +365,7 @@ function AvailableExams({ exams, completedExamIds, onStart, navigate }) {
 
   return (
     <StudentExamShell navigate={navigate}>
-      <div className="bg-background px-4 py-4 font-sans sm:py-6">
+      <div className="bg-background px-4 py-4 font-sans sm:py-4">
         <div className="mx-auto max-w-[900px]">
         <header className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <Brand />
@@ -268,7 +379,7 @@ function AvailableExams({ exams, completedExamIds, onStart, navigate }) {
           </button>
         </header>
 
-        <section className="mt-8 rounded-2xl border border-primary/10 bg-primary p-6 text-primary-foreground shadow-sm sm:p-8">
+        <section className="mt-6 rounded-2xl border border-primary/10 bg-primary p-5 text-primary-foreground shadow-sm sm:p-6">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="flex items-center gap-2">
@@ -294,7 +405,7 @@ function AvailableExams({ exams, completedExamIds, onStart, navigate }) {
           </div>
         </section>
 
-        <div className="mt-6 flex items-end justify-between gap-4">
+        <div className="mt-5 flex items-end justify-between gap-4">
           <div>
             <h2 className="text-lg font-bold text-foreground">Examens programmés</h2>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -308,7 +419,7 @@ function AvailableExams({ exams, completedExamIds, onStart, navigate }) {
           </div>
         </div>
 
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
           {exams.map((exam) => {
             const completed = completedExamIds.includes(exam.id)
             const canRetry = Boolean(exam.canRetry)
@@ -327,7 +438,7 @@ function AvailableExams({ exams, completedExamIds, onStart, navigate }) {
                 className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"
               >
                 <div className={`h-1 ${completed ? "bg-accent" : locked ? "bg-muted-foreground/30" : "bg-primary"}`} />
-                <div className="p-5 sm:p-6">
+                <div className="p-4 sm:p-5">
                   <div className="flex items-start justify-between gap-3">
                     <div className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${
                       completed
@@ -349,11 +460,11 @@ function AvailableExams({ exams, completedExamIds, onStart, navigate }) {
                     </span>
                   </div>
 
-                  <h3 className="mt-4 text-base font-bold leading-snug text-foreground">
+                  <h3 className="mt-3 text-base font-bold leading-snug text-foreground">
                     {exam.title}
                   </h3>
 
-                  <div className={`mt-4 flex items-center gap-3 rounded-xl border px-3.5 py-3 ${
+                  <div className={`mt-3 flex items-center gap-3 rounded-xl border px-3.5 py-3 ${
                     locked ? "border-border bg-muted/40" : "border-primary/15 bg-primary/5"
                   }`}>
                     <CalendarDays className={`size-5 shrink-0 ${locked ? "text-muted-foreground" : "text-primary"}`} />
@@ -363,7 +474,7 @@ function AvailableExams({ exams, completedExamIds, onStart, navigate }) {
                     </div>
                   </div>
 
-                  <div className="mt-5 grid grid-cols-3 divide-x divide-border rounded-xl bg-muted/40 py-3">
+                  <div className="mt-4 grid grid-cols-3 divide-x divide-border rounded-xl bg-muted/40 py-3">
                     <div className="px-2 text-center">
                       <Clock3 className="mx-auto size-4 text-primary" />
                       <p className="mt-1.5 text-[10px] font-semibold text-foreground">
@@ -404,7 +515,7 @@ function AvailableExams({ exams, completedExamIds, onStart, navigate }) {
                     type="button"
                     disabled={completed || locked}
                     onClick={() => onStart(exam)}
-                    className={`mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl text-sm font-bold transition focus:outline-none focus:ring-4 ${
+                    className={`mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl text-sm font-bold transition focus:outline-none focus:ring-4 ${
                       completed || locked
                         ? "cursor-not-allowed bg-muted text-muted-foreground"
                         : "bg-primary text-primary-foreground hover:bg-primary/90 focus:ring-primary/20"
@@ -419,7 +530,7 @@ function AvailableExams({ exams, completedExamIds, onStart, navigate }) {
           })}
         </div>
 
-        <p className="mt-6 text-center text-[11px] leading-relaxed text-muted-foreground">
+        <p className="mt-5 text-center text-[11px] leading-relaxed text-muted-foreground">
           Les dates et les statuts sont actualisés automatiquement.
           </p>
         </div>
@@ -560,7 +671,7 @@ export function StudentExam({ navigate }) {
       const localQuestions = exam?.questions || []
       const score = localQuestions.reduce(
         (total, question) =>
-          Number(answers[question.id]) === Number(question.correctAnswer) ? total + 1 : total,
+          isQuestionCorrect(question, answers[question.id]) ? total + 1 : total,
         0,
       )
       const percentage = localQuestions.length ? (score * 100) / localQuestions.length : 0
@@ -669,8 +780,17 @@ export function StudentExam({ navigate }) {
 
   const questions = exam?.questions || []
   const currentQuestion = questions[currentIndex]
-  const answeredCount = Object.keys(answers).length
+  const answeredCount = questions.reduce(
+    (total, question) => total + (isAnswerComplete(question, answers[question.id]) ? 1 : 0),
+    0,
+  )
   const isLastQuestion = currentIndex === questions.length - 1
+  const currentQuestionType = getQuestionType(currentQuestion)
+  const answerInstruction = currentQuestionType === "qcm"
+    ? "Plusieurs réponses possibles"
+    : currentQuestionType === "liaison"
+      ? "Associez chaque élément"
+      : "Une seule réponse possible"
 
   const requestSubmission = async () => {
     const unanswered = questions.length - answeredCount
@@ -757,7 +877,7 @@ export function StudentExam({ navigate }) {
         <div className="mb-5 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <FileCheck2 className="size-4 text-primary" />
-            Une seule réponse possible
+            {answerInstruction}
           </div>
           <p className="text-xs font-semibold text-muted-foreground">
             {answeredCount}/{questions.length} répondue{answeredCount !== 1 ? "s" : ""}

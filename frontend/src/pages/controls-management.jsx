@@ -178,7 +178,7 @@ function ControlFormModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
       <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-card border border-border rounded-xl shadow-lg p-6">
         <h3 className="text-sm font-black uppercase tracking-widest text-foreground mb-4">
           {controle ? "✏️ Modifier le contrôle" : "➕ Ajouter un contrôle"}

@@ -204,10 +204,10 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground antialiased max-w-full overflow-x-hidden;
+    @apply bg-background text-foreground antialiased max-w-full overflow-x-clip;
   }
   html {
-    @apply font-sans max-w-full overflow-x-hidden;
+    @apply font-sans max-w-full overflow-x-clip;
   }
 }
 
@@ -254,7 +254,12 @@
 @page {
   /* Force landscape page layout and slim margins */
   size: A4 landscape;
-  margin: 15mm 5mm 5mm 5mm;
+  margin: 5mm;
+}
+
+@page exam-results {
+  size: A4 portrait;
+  margin: 12mm;
 }
 
 @media print {
@@ -392,6 +397,727 @@
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
+
+  /* Browser-inspired professor print document */
+  .print-logigramme-document {
+    color: #0f172a;
+    font-family: 'Figtree', ui-sans-serif, system-ui, sans-serif;
+  }
+
+  .print-logigramme-document-header {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8mm;
+    margin-bottom: 3mm;
+    padding: 0 0 3mm;
+    border-bottom: 1.2mm solid #1e3e72;
+  }
+
+  .print-logigramme-brand,
+  .print-logigramme-programme-identity {
+    display: flex;
+    align-items: center;
+  }
+
+  .print-logigramme-brand {
+    gap: 3mm;
+  }
+
+  .print-logigramme-brand-mark {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 21mm;
+    height: 11mm;
+    padding: 0 3mm;
+    border-radius: 2.5mm;
+    background: #1e3e72;
+    color: #fff;
+    font-size: 11pt;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+  }
+
+  .print-logigramme-brand h1 {
+    margin: 0;
+    color: #172554;
+    font-size: 15pt;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+  }
+
+  .print-logigramme-brand p {
+    margin: 0.7mm 0 0;
+    color: #64748b;
+    font-size: 7pt;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .print-logigramme-professor {
+    display: flex;
+    min-width: 54mm;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+
+  .print-logigramme-professor span {
+    color: #64748b;
+    font-size: 6.5pt;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .print-logigramme-professor strong {
+    margin-top: 0.8mm;
+    color: #1e3e72;
+    font-size: 11pt;
+    font-weight: 900;
+  }
+
+  .print-logigramme-summary {
+    display: grid;
+    grid-template-columns: repeat(3, 28mm) 1fr;
+    align-items: center;
+    gap: 2mm;
+    margin-bottom: 4mm;
+    padding: 2.5mm 3mm;
+    border: 0.35mm solid #dbe5f0;
+    border-radius: 3mm;
+    background: #f8fafc;
+  }
+
+  .print-logigramme-summary > div {
+    display: flex;
+    flex-direction: column;
+    padding-right: 2mm;
+    border-right: 0.3mm solid #dbe5f0;
+  }
+
+  .print-logigramme-summary strong {
+    color: #1e3e72;
+    font-size: 9pt;
+    font-weight: 900;
+  }
+
+  .print-logigramme-summary span {
+    color: #64748b;
+    font-size: 5.8pt;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .print-logigramme-summary p {
+    margin: 0;
+    color: #475569;
+    font-size: 6.5pt;
+    font-weight: 600;
+    text-align: right;
+  }
+
+  .print-logigramme-programme {
+    display: block !important;
+    margin-top: 3mm;
+    break-before: auto !important;
+    page-break-before: auto !important;
+    break-after: auto !important;
+    page-break-after: auto !important;
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  .print-logigramme-programme-header {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 5mm;
+    min-height: 12mm;
+    padding: 2.2mm 3mm;
+    border: 0.4mm solid #cbd5e1;
+    border-bottom: 0;
+    border-radius: 3mm 3mm 0 0;
+    background: #fff;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .print-logigramme-programme-identity {
+    min-width: 0;
+    gap: 2mm;
+  }
+
+  .print-logigramme-programme-index {
+    color: #94a3b8;
+    font-size: 6pt;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+  }
+
+  .print-logigramme-programme-code {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16mm;
+    height: 7mm;
+    padding: 0 2.5mm;
+    border-radius: 1.8mm;
+    background: #1e3e72;
+    color: #fff;
+    font-size: 7pt;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+  }
+
+  .print-logigramme-programme-identity h2 {
+    margin: 0;
+    color: #0f172a;
+    font-size: 9pt;
+    font-weight: 900;
+    letter-spacing: 0.01em;
+  }
+
+  .print-logigramme-programme-identity p {
+    margin: 0.5mm 0 0;
+    color: #64748b;
+    font-size: 6.5pt;
+    font-weight: 700;
+  }
+
+  .print-logigramme-programme-stats {
+    display: flex;
+    align-items: center;
+    gap: 2mm;
+    flex-shrink: 0;
+  }
+
+  .print-logigramme-programme-stats span {
+    padding: 1.4mm 2mm;
+    border: 0.3mm solid #dbe5f0;
+    border-radius: 1.5mm;
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 5.8pt;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .print-logigramme-programme-stats strong {
+    color: #1e3e72;
+    font-weight: 900;
+  }
+
+  .print-logigramme-table-frame {
+    overflow: visible !important;
+    border: 0.4mm solid #cbd5e1;
+    border-radius: 0 0 3mm 3mm;
+  }
+
+  .print-logigramme-table {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0;
+    border: 0 !important;
+    border-collapse: collapse !important;
+    table-layout: fixed !important;
+    font-size: 6pt;
+  }
+
+  .print-logigramme-table thead {
+    display: table-header-group;
+  }
+
+  .print-logigramme-table th,
+  .print-logigramme-table td {
+    border: 0.25mm solid #cbd5e1 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .print-logigramme-table tr > :first-child {
+    border-left: 0 !important;
+  }
+
+  .print-logigramme-table tr > :last-child {
+    border-right: 0 !important;
+  }
+
+  .print-logigramme-table thead tr:first-child > * {
+    border-top: 0 !important;
+  }
+
+  .print-logigramme-table tbody tr:last-child > * {
+    border-bottom: 0 !important;
+  }
+
+  .print-logigramme-plan-title {
+    padding: 2mm !important;
+    background: #ffe600 !important;
+    color: #111827 !important;
+    font-size: 7.5pt !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.14em !important;
+    text-align: center;
+    text-transform: uppercase;
+  }
+
+  .print-logigramme-month {
+    padding: 1.7mm 0.6mm !important;
+    background: #fff !important;
+    color: #1e293b !important;
+    font-size: 6pt !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.05em !important;
+    text-align: center;
+    text-transform: uppercase;
+  }
+
+  .print-logigramme-fixed-heading,
+  .print-logigramme-progress-heading,
+  .print-logigramme-week-number,
+  .print-logigramme-week-date {
+    background: #f8fafc !important;
+    color: #334155 !important;
+    font-weight: 900 !important;
+    text-align: center;
+    text-transform: uppercase;
+  }
+
+  .print-logigramme-fixed-heading,
+  .print-logigramme-progress-heading {
+    padding: 1.2mm 0.8mm !important;
+    font-size: 5.8pt !important;
+    letter-spacing: 0.05em !important;
+  }
+
+  .print-logigramme-unit-heading {
+    padding-left: 2mm !important;
+    text-align: left;
+  }
+
+  .print-logigramme-week-number {
+    padding: 1mm 0.2mm !important;
+    font-size: 5.5pt !important;
+  }
+
+  .print-logigramme-week-date {
+    padding: 0.8mm 0.1mm !important;
+    color: #64748b !important;
+    font-size: 4.8pt !important;
+    letter-spacing: -0.03em !important;
+  }
+
+  .print-logigramme-table.is-dense .print-logigramme-week-number,
+  .print-logigramme-table.is-dense .print-logigramme-week-date {
+    font-size: 4.2pt !important;
+  }
+
+  .print-logigramme-row-number,
+  .print-logigramme-vhg {
+    padding: 1.6mm 0.5mm !important;
+    background: #fff !important;
+    color: #334155;
+    font-size: 6pt;
+    font-weight: 900;
+    text-align: center;
+  }
+
+  .print-logigramme-unit-name {
+    padding: 1.6mm 2mm !important;
+    background: #fef9c3 !important;
+    color: #1e293b;
+    font-size: 6.2pt;
+    font-weight: 800;
+    line-height: 1.2;
+    text-align: left;
+    white-space: normal !important;
+  }
+
+  .print-schedule-cell {
+    height: 8.5mm;
+    padding: 0.8mm 0.1mm !important;
+    color: #1e293b;
+    font-size: 5.5pt;
+    font-weight: 900;
+    text-align: center;
+    white-space: nowrap !important;
+  }
+
+  .print-logigramme-table.is-dense .print-schedule-cell {
+    font-size: 4.5pt;
+    letter-spacing: -0.04em;
+  }
+
+  .print-schedule-cell--empty {
+    background: #fff !important;
+  }
+
+  .print-schedule-cell--normal {
+    background: #fef9c3 !important;
+  }
+
+  .print-schedule-cell--done {
+    background: #bbf7d0 !important;
+  }
+
+  .print-schedule-cell--vacation {
+    background: #f472b6 !important;
+  }
+
+  .print-schedule-cell--exam {
+    background: #e2e8f0 !important;
+  }
+
+  .print-schedule-cell--tiff {
+    background: #facc15 !important;
+  }
+
+  .print-logigramme-progress-cell {
+    padding: 1.2mm 1.3mm !important;
+    background: #fff !important;
+    vertical-align: middle;
+  }
+
+  .print-logigramme-progress-value {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1mm;
+    color: #475569;
+    font-size: 5pt;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .print-logigramme-progress-value strong {
+    color: #1e3e72;
+    font-weight: 900;
+  }
+
+  .print-logigramme-progress-caption {
+    margin-top: 0.5mm;
+    color: #94a3b8;
+    font-size: 4.4pt;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  .print-logigramme-progress-track {
+    height: 1.2mm;
+    margin-top: 0.7mm;
+    overflow: hidden;
+    border-radius: 1mm;
+    background: #e2e8f0;
+  }
+
+  .print-logigramme-progress-track span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: #1e3e72;
+  }
+
+  .print-logigramme-progress-track span.is-complete {
+    background: #10b981;
+  }
+
+  .print-logigramme-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 5mm;
+    margin-top: 3mm;
+    padding-top: 2mm;
+    border-top: 0.3mm solid #cbd5e1;
+    color: #64748b;
+    font-size: 5.5pt;
+    font-weight: 700;
+  }
+
+  .print-logigramme-legend {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2mm 4mm;
+  }
+
+  .print-logigramme-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 1.2mm;
+    color: #475569;
+    font-size: 5.5pt;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  .print-logigramme-legend-swatch {
+    display: inline-block;
+    width: 3mm;
+    height: 3mm;
+    border: 0.25mm solid #94a3b8;
+    border-radius: 0.8mm;
+    flex-shrink: 0;
+  }
+
+  /* Student exam result report */
+  .print-exam-report {
+    page: exam-results;
+    width: 100% !important;
+    color: #0f172a;
+    font-family: 'Figtree', ui-sans-serif, system-ui, sans-serif;
+  }
+
+  .print-exam-report-heading {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8mm;
+    margin-bottom: 6mm;
+    padding: 0 0 4mm !important;
+    border-bottom: 1.2mm solid #1e3e72;
+  }
+
+  .print-exam-report-brand {
+    display: flex;
+    align-items: center;
+    gap: 3mm;
+  }
+
+  .print-exam-report-mark {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22mm;
+    height: 12mm;
+    padding: 0 3mm;
+    border-radius: 2.5mm;
+    background: #1e3e72;
+    color: #fff;
+    font-size: 11pt;
+    font-weight: 900;
+    letter-spacing: 0.1em;
+  }
+
+  .print-exam-report-brand h1 {
+    margin: 0;
+    color: #172554;
+    font-size: 15pt;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+  }
+
+  .print-exam-report-brand p {
+    margin: 1mm 0 0;
+    color: #64748b;
+    font-size: 7pt;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .print-exam-report-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    flex-shrink: 0;
+  }
+
+  .print-exam-report-meta span,
+  .print-exam-student-card span,
+  .print-exam-summary span {
+    color: #64748b;
+    font-size: 6pt;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .print-exam-report-meta strong {
+    margin-top: 1mm;
+    color: #1e3e72;
+    font-size: 9pt;
+  }
+
+  .print-exam-student-card {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 6mm;
+    margin-bottom: 4mm;
+    padding: 4mm 5mm !important;
+    border: 0.35mm solid #cbd5e1;
+    border-radius: 3mm;
+    background: #f8fafc;
+  }
+
+  .print-exam-student-card > div {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .print-exam-student-section {
+    margin-top: 5mm;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-exam-student-totals {
+    grid-column: 1 / -1;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 2.5mm;
+    border-top: 0.25mm solid #dbe5f0;
+  }
+
+  .print-exam-student-totals strong {
+    margin-top: 0 !important;
+    color: #1e3e72 !important;
+    font-size: 12pt !important;
+  }
+
+  .print-exam-student-card strong {
+    margin-top: 1mm;
+    color: #0f172a;
+    font-size: 10pt;
+    font-weight: 900;
+  }
+
+  .print-exam-summary {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2mm;
+    margin-bottom: 5mm;
+    padding: 0 !important;
+  }
+
+  .print-exam-summary > div {
+    display: flex;
+    min-height: 18mm;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 0.35mm solid #dbe5f0;
+    border-radius: 2.5mm;
+    background: #f8fafc;
+  }
+
+  .print-exam-summary strong {
+    color: #1e3e72;
+    font-size: 15pt;
+    font-weight: 900;
+  }
+
+  .print-exam-summary span {
+    margin-top: 1mm;
+  }
+
+  .print-exam-report .print-exam-results-table {
+    width: 100% !important;
+    border: 0.45mm solid #1e3e72 !important;
+    border-collapse: collapse !important;
+    table-layout: fixed !important;
+  }
+
+  .print-exam-results-table thead {
+    display: table-header-group;
+  }
+
+  .print-exam-report .print-exam-results-table th,
+  .print-exam-report .print-exam-results-table td {
+    padding: 2.6mm 2mm !important;
+    border: 0.25mm solid #94a3b8 !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: normal !important;
+    vertical-align: middle;
+  }
+
+  .print-exam-report .print-exam-results-table th {
+    background: #e8eef6 !important;
+    color: #1e3e72 !important;
+    font-size: 6pt;
+    font-weight: 900;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .print-exam-report .print-exam-results-table td {
+    color: #334155 !important;
+    font-size: 7pt;
+    font-weight: 600;
+  }
+
+  .print-exam-results-table th:first-child,
+  .print-exam-results-table td:first-child {
+    width: 25%;
+    color: #0f172a !important;
+    font-weight: 800;
+  }
+
+  .print-exam-results-table th:nth-child(2),
+  .print-exam-results-table td:nth-child(2) {
+    width: 15%;
+  }
+
+  .print-exam-results-table th:nth-child(3),
+  .print-exam-results-table td:nth-child(3),
+  .print-exam-results-table th:nth-child(4),
+  .print-exam-results-table td:nth-child(4),
+  .print-exam-results-table th:nth-child(5),
+  .print-exam-results-table td:nth-child(5) {
+    width: 9%;
+    text-align: center;
+  }
+
+  .print-exam-percentage {
+    color: #1e3e72 !important;
+    font-size: 9pt !important;
+    font-weight: 900 !important;
+  }
+
+  .print-exam-results-table .is-passed,
+  .print-exam-results-table .is-failed {
+    display: inline-flex;
+    padding: 1mm 2mm;
+    border-radius: 999px;
+    font-size: 6pt;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+
+  .print-exam-results-table .is-passed {
+    background: #d1fae5;
+    color: #047857;
+  }
+
+  .print-exam-results-table .is-failed {
+    background: #fee2e2;
+    color: #b91c1c;
+  }
+
+  .print-exam-report-footer {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6mm;
+    margin-top: 5mm;
+    padding: 3mm 0 0 !important;
+    border-top: 0.3mm solid #cbd5e1;
+    color: #64748b;
+    font-size: 6pt;
+    font-weight: 700;
+  }
+
+  .print-exam-report-footer p {
+    margin: 0;
+  }
+
 
   /* Force light mode tokens for print */
   :root, .dark {

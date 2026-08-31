@@ -99,7 +99,7 @@ export function EditLogigrammeModal({ isOpen, onClose, logigrammeData, onSaveSuc
     : 'Modifier le logigramme'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="w-full max-w-3xl rounded-2xl border border-border bg-card p-6 shadow-2xl medical-glass animate-in zoom-in-95 duration-200 max-h-[85vh] flex flex-col">
 
         {/* Header */}

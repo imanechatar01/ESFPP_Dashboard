@@ -224,7 +224,7 @@ export function StudentCourses({ path, navigate }) {
 
       {/* Video Player Modal */}
       {activeVideo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
           <div className="relative w-full max-w-4xl rounded-2xl border border-white/10 bg-card overflow-hidden shadow-2xl flex flex-col medical-glass">
 
             {/* Modal Header */}

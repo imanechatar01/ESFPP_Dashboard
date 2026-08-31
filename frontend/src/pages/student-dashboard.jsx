@@ -1,6 +1,25 @@
-import { BookOpenCheck, CalendarDays, ClipboardList, UserRound, GraduationCap, MapPin, Clock, ArrowRight, Video, ClipboardCheck } from "lucide-react"
+import { useCallback, useEffect, useState } from "react"
+import {
+  AlertCircle,
+  ArrowRight,
+  BookOpenCheck,
+  CalendarDays,
+  CheckCircle2,
+  ClipboardCheck,
+  Clock,
+  FileCheck2,
+  GraduationCap,
+  Layers3,
+  Loader2,
+  Mail,
+  PlayCircle,
+  RefreshCw,
+  UserRound,
+  Video,
+} from "lucide-react"
 import { DashboardShell } from "@/components/layout/dashboard-shell"
 import { useAuth } from "@/contexts/auth-context"
+import { apiRequest } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 const navItems = [
@@ -9,123 +28,407 @@ const navItems = [
   { label: "Mes examens", path: "/student/exams", icon: ClipboardCheck },
 ]
 
+function formatDate(value) {
+  if (!value) return "Date à confirmer"
+
+  const date = new Date(value.includes("T") ? value : `${value}T12:00:00`)
+  if (Number.isNaN(date.getTime())) return "Date à confirmer"
+
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date)
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-6" aria-label="Chargement du tableau de bord">
+      <div className="h-48 animate-pulse rounded-2xl bg-muted" />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {[1, 2, 3, 4].map((item) => (
+          <div key={item} className="h-28 animate-pulse rounded-2xl bg-muted" />
+        ))}
+      </div>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="h-72 animate-pulse rounded-2xl bg-muted" />
+        <div className="h-72 animate-pulse rounded-2xl bg-muted" />
+      </div>
+    </div>
+  )
+}
+
 export function StudentDashboard({ path, navigate }) {
   const { user } = useAuth()
-  const firstName = user?.user_metadata?.first_name || user?.user_metadata?.prenom || user?.email?.split('@')[0] || "Étudiant"
+  const metadata = user?.user_metadata || {}
+  const firstName = metadata.first_name || metadata.prenom || user?.email?.split("@")[0] || "Étudiant"
+  const fullName = [
+    metadata.first_name || metadata.prenom,
+    metadata.last_name || metadata.nom,
+  ].filter(Boolean).join(" ") || firstName
+  const studentFiliereId = metadata.filiere_id || ""
+  const studentClasseId = metadata.classe_id || ""
+
+  const [courses, setCourses] = useState([])
+  const [exams, setExams] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [error, setError] = useState("")
+  const [lastUpdated, setLastUpdated] = useState(null)
+
+  const loadDashboard = useCallback(async (refresh = false) => {
+    if (refresh) setRefreshing(true)
+    else setLoading(true)
+    setError("")
+
+    const [coursesResult, examsResult] = await Promise.allSettled([
+      apiRequest("/api/courses"),
+      apiRequest("/api/exams/available"),
+    ])
+
+    if (coursesResult.status === "fulfilled") {
+      setCourses(Array.isArray(coursesResult.value) ? coursesResult.value : [])
+    }
+    if (examsResult.status === "fulfilled") {
+      setExams(Array.isArray(examsResult.value) ? examsResult.value : [])
+    }
+
+    const failedSections = [
+      coursesResult.status === "rejected" ? "les cours" : null,
+      examsResult.status === "rejected" ? "les examens" : null,
+    ].filter(Boolean)
+
+    if (failedSections.length) {
+      setError(`Impossible de charger ${failedSections.join(" et ")}. Vous pouvez réessayer.`)
+    }
+
+    setLastUpdated(new Date())
+    setLoading(false)
+    setRefreshing(false)
+  }, [])
+
+  useEffect(() => {
+    if (user?.id) loadDashboard()
+  }, [loadDashboard, user?.id])
+
+  const visibleCourses = courses.filter((course) => {
+    const matchesFiliere = !studentFiliereId || !course.filiere_id || course.filiere_id === studentFiliereId
+    const matchesClasse = !studentClasseId || !course.classe_id || course.classe_id === studentClasseId
+    return matchesFiliere && matchesClasse
+  })
+  const recentCourses = [...visibleCourses]
+    .sort((left, right) => new Date(right.created_at || 0) - new Date(left.created_at || 0))
+    .slice(0, 3)
+  const sortedExams = [...exams]
+    .filter((exam) => exam.questions?.length)
+    .sort((left, right) => {
+      if (!left.date) return 1
+      if (!right.date) return -1
+      return new Date(left.date) - new Date(right.date)
+    })
+  const recentExams = sortedExams.slice(0, 3)
+  const completedExams = sortedExams.filter((exam) => exam.completed)
+  const passedExams = sortedExams.filter((exam) => exam.result?.passed)
+  const availableExams = sortedExams.filter((exam) => !exam.locked && !exam.completed)
+
+  const courseWithFormation = visibleCourses.find((course) => course.filiere || course.classe)
+  const formationName = metadata.filiere_name || courseWithFormation?.filiere?.name || "Formation non renseignée"
+  const classeName = metadata.classe_name || metadata.classe_label || courseWithFormation?.classe?.label || "Classe non renseignée"
+
+  const stats = [
+    {
+      label: "Cours disponibles",
+      value: visibleCourses.length,
+      helper: `${recentCourses.length} récent${recentCourses.length !== 1 ? "s" : ""}`,
+      icon: PlayCircle,
+      color: "text-primary",
+      bg: "bg-primary/10",
+      path: "/student/courses",
+    },
+    {
+      label: "Examens ouverts",
+      value: availableExams.length,
+      helper: availableExams.length ? "À passer maintenant" : "Aucun examen ouvert",
+      icon: FileCheck2,
+      color: "text-amber-600",
+      bg: "bg-amber-500/10",
+      path: "/student/exams",
+    },
+    {
+      label: "Examens terminés",
+      value: completedExams.length,
+      helper: `${sortedExams.length} examen${sortedExams.length !== 1 ? "s" : ""} au total`,
+      icon: CheckCircle2,
+      color: "text-accent",
+      bg: "bg-accent/10",
+      path: "/student/exams",
+    },
+    {
+      label: "Examens validés",
+      value: passedExams.length,
+      helper: completedExams.length ? `${passedExams.length}/${completedExams.length} terminés` : "Aucun résultat final",
+      icon: GraduationCap,
+      color: "text-violet-600",
+      bg: "bg-violet-500/10",
+      path: "/student/exams",
+    },
+  ]
 
   return (
     <DashboardShell
       title="Espace Étudiant"
-      subtitle="Accédez à vos cours et à vos ressources pédagogiques."
+      subtitle="Votre tableau de bord académique actualisé."
       navItems={navItems}
       activePath={path}
       navigate={navigate}
       accent="student"
     >
-      <section className="relative overflow-hidden rounded-2xl border border-primary/10 bg-gradient-to-br from-primary/5 via-primary/[0.02] to-transparent p-8 shadow-sm medical-glass">
-        <div className="relative z-10">
-          <div className="flex items-center gap-2 mb-4">
-             <div className="px-2.5 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest border border-primary/20">
-               Session {new Date().getFullYear()}
-             </div>
-          </div>
-          <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-foreground leading-tight">
-            Bonjour, {firstName}. <br className="hidden sm:block" />
-            Votre portail est prêt.
-          </h2>
-          <p className="mt-4 max-w-2xl text-base font-medium text-muted-foreground leading-relaxed">
-            Bienvenue sur votre espace personnel ESFPP. Retrouvez ici vos cours, vos affectations de stage et votre suivi administratif.
-          </p>
-          <div className="mt-8 flex flex-wrap gap-4">
-            <button 
-              onClick={() => navigate('/student/courses')}
-              className="h-11 px-6 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-lg shadow-primary/20 transition-all hover:shadow-primary/30 flex items-center gap-2 group"
-            >
-              Mes cours
-              <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
-            </button>
-            <button className="h-11 px-6 rounded-xl border border-border bg-background/50 backdrop-blur-sm font-bold text-sm transition-all hover:bg-background">
-              Mon planning
-            </button>
-          </div>
-        </div>
-        
-        {/* Decorative background element */}
-        <GraduationCap className="absolute -bottom-6 -right-6 size-48 text-primary/5 -rotate-12 pointer-events-none" />
-      </section>
-
-      <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_1.8fr]">
-        <section className="rounded-2xl border border-border bg-card p-6 shadow-sm medical-glass">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 rounded-lg bg-accent/10">
-              <UserRound className="size-5 text-accent" />
-            </div>
-            <h2 className="text-lg font-bold tracking-tight">Mon Profil</h2>
-          </div>
-          
-          <div className="space-y-1">
-            {[
-              { label: "Email académique", value: user?.email, icon: null },
-              { label: "Rôle", value: "Étudiant ESFPP", icon: null },
-              { label: "Statut du compte", value: "Vérifié & Actif", icon: null, color: "text-accent" },
-              { label: "Dernière connexion", value: "Aujourd'hui", icon: null },
-            ].map((item, i) => (
-              <div key={i} className="flex flex-col py-3 border-b border-border/50 last:border-0">
-                <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground/60">{item.label}</span>
-                <span className={cn("text-sm font-bold mt-1", item.color || "text-foreground")}>{item.value}</span>
+      {loading ? (
+        <DashboardSkeleton />
+      ) : (
+        <div className="space-y-6">
+          {error && (
+            <div className="flex flex-col gap-3 rounded-2xl border border-destructive/20 bg-destructive/5 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3 text-destructive">
+                <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                <p className="font-semibold">{error}</p>
               </div>
-            ))}
-          </div>
-          
-          <button className="w-full mt-6 py-3 rounded-xl bg-muted/50 text-xs font-bold uppercase tracking-widest text-muted-foreground hover:bg-muted transition-colors">
-            Modifier mes informations
-          </button>
-        </section>
-
-        <div className="grid gap-6">
-          <section className="grid gap-4 sm:grid-cols-3">
-            {[
-              { label: "Cours", icon: BookOpenCheck, value: "Modules S1", helper: "4 documents", color: "text-primary", bg: "bg-primary/10", path: "/student/courses" },
-              { label: "Stages", icon: MapPin, value: "Non affecté", helper: "Dossier en cours", color: "text-accent", bg: "bg-accent/10" },
-              { label: "Examens", icon: ClipboardList, value: "Session Janv.", helper: "Calendrier à venir", color: "text-secondary-foreground", bg: "bg-secondary" },
-            ].map((card) => (
-              <div 
-                key={card.label} 
-                onClick={() => card.path && navigate(card.path)}
-                className={cn(
-                  "group cursor-pointer rounded-2xl border border-border bg-card p-5 transition-all hover:shadow-lg hover:-translate-y-1",
-                  !card.path && "pointer-events-none opacity-90"
-                )}
+              <button
+                type="button"
+                onClick={() => loadDashboard(true)}
+                disabled={refreshing}
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-destructive/20 bg-card px-4 text-xs font-bold text-destructive transition hover:bg-destructive/5 disabled:opacity-60"
               >
-                <div className={cn("flex size-10 items-center justify-center rounded-xl mb-4 transition-colors", card.bg)}>
-                  <card.icon className={cn("size-5", card.color)} />
+                <RefreshCw className={cn("size-3.5", refreshing && "animate-spin")} />
+                Réessayer
+              </button>
+            </div>
+          )}
+
+          <section className="relative overflow-hidden rounded-2xl border border-primary/10 bg-gradient-to-br from-primary/10 via-primary/[0.04] to-transparent p-6 shadow-sm medical-glass sm:p-8">
+            <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <div className="mb-4 flex flex-wrap items-center gap-2">
+                  <span className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-primary">
+                    Session {new Date().getFullYear()}
+                  </span>
+                  {lastUpdated && (
+                    <span className="text-[10px] font-semibold text-muted-foreground">
+                      Mis à jour à {lastUpdated.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  )}
                 </div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">{card.label}</p>
-                <p className="mt-1 text-lg font-black text-foreground">{card.value}</p>
-                <p className="mt-1 text-[10px] font-medium text-muted-foreground/70">{card.helper}</p>
+                <h2 className="text-3xl font-black leading-tight tracking-tight text-foreground sm:text-4xl">
+                  Bonjour, {firstName}.
+                </h2>
+                <p className="mt-3 max-w-2xl text-sm font-medium leading-relaxed text-muted-foreground sm:text-base">
+                  Vous avez {visibleCourses.length} cours disponible{visibleCourses.length !== 1 ? "s" : ""} et {availableExams.length} examen{availableExams.length !== 1 ? "s" : ""} ouvert{availableExams.length !== 1 ? "s" : ""} dans votre espace.
+                </p>
               </div>
+
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() => navigate("/student/courses")}
+                  className="inline-flex h-11 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 transition hover:bg-primary/90"
+                >
+                  Voir mes cours
+                  <ArrowRight className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => loadDashboard(true)}
+                  disabled={refreshing}
+                  className="inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-card/80 px-4 text-sm font-bold text-muted-foreground transition hover:bg-card hover:text-foreground disabled:opacity-60"
+                >
+                  {refreshing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+                  Actualiser
+                </button>
+              </div>
+            </div>
+            <GraduationCap className="pointer-events-none absolute -bottom-8 -right-5 size-44 -rotate-12 text-primary/5" />
+          </section>
+
+          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Résumé étudiant">
+            {stats.map((stat) => (
+              <button
+                key={stat.label}
+                type="button"
+                onClick={() => navigate(stat.path)}
+                className="group rounded-2xl border border-border bg-card p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-md"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className={cn("flex size-10 items-center justify-center rounded-xl", stat.bg)}>
+                    <stat.icon className={cn("size-5", stat.color)} />
+                  </div>
+                  <ArrowRight className="size-4 text-muted-foreground/30 transition group-hover:translate-x-0.5 group-hover:text-primary" />
+                </div>
+                <p className="mt-4 text-2xl font-black tabular-nums text-foreground">{stat.value}</p>
+                <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">{stat.label}</p>
+                <p className="mt-1.5 text-[11px] font-medium text-muted-foreground/70">{stat.helper}</p>
+              </button>
             ))}
           </section>
 
-          <section className="rounded-2xl border border-border bg-card p-6 shadow-sm medical-glass">
-             <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <Clock className="size-5 text-primary" />
+          <div className="grid gap-6 xl:grid-cols-[1fr_1fr_0.72fr]">
+            <section className="rounded-2xl border border-border bg-card p-5 shadow-sm medical-glass sm:p-6">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <Video className="size-4.5" />
+                  </div>
+                  <div>
+                    <h2 className="font-bold text-foreground">Cours récents</h2>
+                    <p className="text-[11px] text-muted-foreground">Les dernières ressources publiées</p>
+                  </div>
                 </div>
-                <h2 className="text-lg font-bold tracking-tight">Prochainement</h2>
-             </div>
-             
-             <div className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="size-16 rounded-full bg-muted flex items-center justify-center mb-4">
-                   <CalendarDays className="size-8 text-muted-foreground/30" />
+                <button type="button" onClick={() => navigate("/student/courses")} className="text-xs font-bold text-primary hover:underline">
+                  Tout voir
+                </button>
+              </div>
+
+              <div className="mt-5 space-y-3">
+                {recentCourses.length ? recentCourses.map((course) => (
+                  <button
+                    key={course.id}
+                    type="button"
+                    onClick={() => navigate("/student/courses")}
+                    className="group flex w-full items-center gap-3 rounded-xl border border-border/70 bg-background/50 p-3 text-left transition hover:border-primary/25 hover:bg-primary/[0.03]"
+                  >
+                    <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                      <PlayCircle className="size-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold text-foreground">{course.title}</p>
+                      <p className="mt-1 truncate text-[10px] font-semibold text-muted-foreground">
+                        {course.filiere?.name || "Toutes les filières"}{course.classe?.label ? ` · ${course.classe.label}` : ""}
+                      </p>
+                    </div>
+                    <ArrowRight className="size-4 shrink-0 text-muted-foreground/30 transition group-hover:translate-x-0.5 group-hover:text-primary" />
+                  </button>
+                )) : (
+                  <div className="rounded-xl border border-dashed border-border px-4 py-9 text-center">
+                    <Video className="mx-auto size-8 text-muted-foreground/20" />
+                    <p className="mt-3 text-sm font-bold text-muted-foreground">Aucun cours disponible</p>
+                    <p className="mt-1 text-xs text-muted-foreground/60">Les nouvelles ressources apparaîtront ici.</p>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-border bg-card p-5 shadow-sm medical-glass sm:p-6">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex size-9 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600">
+                    <CalendarDays className="size-4.5" />
+                  </div>
+                  <div>
+                    <h2 className="font-bold text-foreground">Mes examens</h2>
+                    <p className="text-[11px] text-muted-foreground">Disponibilités et résultats</p>
+                  </div>
                 </div>
-                <p className="text-sm font-bold text-muted-foreground">Aucun événement prévu cette semaine</p>
-                <p className="text-xs text-muted-foreground/60 mt-1 max-w-[240px]">Les plannings de cours et de stages seront affichés ici dès leur publication.</p>
-             </div>
-          </section>
+                <button type="button" onClick={() => navigate("/student/exams")} className="text-xs font-bold text-primary hover:underline">
+                  Tout voir
+                </button>
+              </div>
+
+              <div className="mt-5 space-y-3">
+                {recentExams.length ? recentExams.map((exam) => {
+                  const completed = Boolean(exam.completed)
+                  const available = !exam.locked && !completed
+                  return (
+                    <button
+                      key={exam.id}
+                      type="button"
+                      onClick={() => navigate("/student/exams")}
+                      className="group flex w-full items-center gap-3 rounded-xl border border-border/70 bg-background/50 p-3 text-left transition hover:border-primary/25 hover:bg-primary/[0.03]"
+                    >
+                      <div className={cn(
+                        "flex size-11 shrink-0 items-center justify-center rounded-xl",
+                        completed ? "bg-accent/10 text-accent" : available ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
+                      )}>
+                        {completed ? <CheckCircle2 className="size-5" /> : <ClipboardCheck className="size-5" />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="truncate text-sm font-bold text-foreground">{exam.title}</p>
+                          <span className={cn(
+                            "shrink-0 rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-wider",
+                            completed ? "bg-accent/10 text-accent" : available ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
+                          )}>
+                            {completed ? "Terminé" : available ? "Ouvert" : "Programmé"}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-[10px] font-semibold text-muted-foreground">
+                          {formatDate(exam.date)} · {exam.duration || 60} min
+                        </p>
+                      </div>
+                    </button>
+                  )
+                }) : (
+                  <div className="rounded-xl border border-dashed border-border px-4 py-9 text-center">
+                    <CalendarDays className="mx-auto size-8 text-muted-foreground/20" />
+                    <p className="mt-3 text-sm font-bold text-muted-foreground">Aucun examen programmé</p>
+                    <p className="mt-1 text-xs text-muted-foreground/60">Le calendrier se mettra à jour automatiquement.</p>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-border bg-card p-5 shadow-sm medical-glass sm:p-6">
+              <div className="flex items-center gap-3">
+                <div className="flex size-9 items-center justify-center rounded-xl bg-accent/10 text-accent">
+                  <UserRound className="size-4.5" />
+                </div>
+                <div>
+                  <h2 className="font-bold text-foreground">Mon parcours</h2>
+                  <p className="text-[11px] text-muted-foreground">Informations académiques</p>
+                </div>
+              </div>
+
+              <div className="mt-5 space-y-4">
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground/60">Étudiant</p>
+                  <p className="mt-1 text-sm font-bold text-foreground">{fullName}</p>
+                </div>
+                <div className="border-t border-border/60 pt-4">
+                  <div className="flex items-start gap-2.5">
+                    <Mail className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0">
+                      <p className="text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground/60">Email</p>
+                      <p className="mt-1 truncate text-xs font-semibold text-foreground" title={user?.email}>{user?.email || "Non renseigné"}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="border-t border-border/60 pt-4">
+                  <div className="flex items-start gap-2.5">
+                    <Layers3 className="mt-0.5 size-4 shrink-0 text-primary" />
+                    <div>
+                      <p className="text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground/60">Filière</p>
+                      <p className="mt-1 text-xs font-semibold text-foreground">{formationName}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="border-t border-border/60 pt-4">
+                  <div className="flex items-start gap-2.5">
+                    <GraduationCap className="mt-0.5 size-4 shrink-0 text-primary" />
+                    <div>
+                      <p className="text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground/60">Classe</p>
+                      <p className="mt-1 text-xs font-semibold text-foreground">{classeName}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="border-t border-border/60 pt-4">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold text-accent">
+                    <Clock className="size-3.5" />
+                    Données synchronisées
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
         </div>
-      </div>
+      )}
     </DashboardShell>
   )
 }
-
