@@ -1,5 +1,6 @@
 import express from 'express';
 import { supabaseAdmin } from '../lib/supabase.js';
+import { requireRole } from '../lib/auth.js';
 
 const router = express.Router();
 
@@ -179,6 +180,41 @@ router.get('/:id/weeks', async (req, res) => {
 
     if (error) throw error;
     res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/years/:id
+router.delete('/:id', requireRole('admin'), async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const { data: year, error: yearError } = await supabaseAdmin
+      .from('academic_years')
+      .select('id, label, is_current')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (yearError) throw yearError;
+    if (!year) {
+      return res.status(404).json({ error: 'Année académique introuvable.' });
+    }
+
+    if (year.is_current) {
+      return res.status(409).json({
+        error: 'Impossible de supprimer l\'année active. Définissez une autre année comme active avant de la supprimer.'
+      });
+    }
+
+    const { error: deleteError } = await supabaseAdmin
+      .from('academic_years')
+      .delete()
+      .eq('id', id);
+
+    if (deleteError) throw deleteError;
+
+    res.status(200).json({ message: 'Academic year deleted', id });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
