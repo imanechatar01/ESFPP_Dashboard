@@ -510,6 +510,8 @@ router.post('/duplicate-year', async (req, res) => {
       return res.status(404).json({ error: 'Année cible introuvable.' });
     }
 
+    const resolvedTargetYearId = targetYear.id;
+
     if (sourceYear.id === targetYear.id) {
       return res.status(400).json({ error: 'L\'année source et l\'année cible doivent être différentes.' });
     }
@@ -518,7 +520,7 @@ router.post('/duplicate-year', async (req, res) => {
     const { data: existingLogs, error: existingError } = await supabaseAdmin
       .from('logigrammes')
       .select('id')
-      .eq('academic_year_id', target_year_id);
+      .eq('academic_year_id', resolvedTargetYearId);
     if (existingError) throw existingError;
     if (existingLogs && existingLogs.length > 0) {
       return res.status(409).json({
@@ -549,7 +551,7 @@ router.post('/duplicate-year', async (req, res) => {
     const { data: tgtExistingWeeks, error: tgtWeeksCheckError } = await supabaseAdmin
       .from('year_weeks')
       .select('semaine, week_start_date')
-      .eq('academic_year_id', target_year_id);
+      .eq('academic_year_id', resolvedTargetYearId);
     if (tgtWeeksCheckError) throw tgtWeeksCheckError;
 
     // Build the date map for target year using ISO 8601 exact calculation
@@ -563,8 +565,8 @@ router.post('/duplicate-year', async (req, res) => {
       console.log(`[duplicate-year] Using ${tgtExistingWeeks.length} existing year_weeks for "${targetYear.label}"`);
     } else {
       // Generate year_weeks using ISO 8601 exact calculation
-      const weekInserts = [];
-      for (const srcWeek of srcWeeks) {
+        const weekInserts = [];
+        for (const srcWeek of srcWeeks) {
         const { semaine, mois, semestre } = srcWeek;
         // Determine if the week belongs to the next calendar year
         // Academic year "2026-2027" starts in 2026 → weeks 1-12 may be in 2027
@@ -583,7 +585,7 @@ router.post('/duplicate-year', async (req, res) => {
 
         const moisStr = new Date(monday + 'T00:00:00Z').toLocaleString('fr-FR', { month: 'long', timeZone: 'UTC' });
         weekInserts.push({
-          academic_year_id: target_year_id,
+          academic_year_id: resolvedTargetYearId,
           semaine,
           week_start_date: monday,
           mois: moisStr.charAt(0).toUpperCase() + moisStr.slice(1),
@@ -626,7 +628,7 @@ router.post('/duplicate-year', async (req, res) => {
         .insert({
           filiere_id: srcLog.filiere_id,
           classe_id: srcLog.classe_id,
-          academic_year_id: target_year_id,
+          academic_year_id: resolvedTargetYearId,
           auto_complete: srcLog.auto_complete
           // NOTE: completions are NOT copied — auto-mark re-applies via date comparison
         })

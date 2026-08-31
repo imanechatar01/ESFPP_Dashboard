@@ -9,7 +9,9 @@ import {
   Loader2,
   CalendarDays,
   Copy,
-  AlertCircle
+  AlertCircle,
+  Trash2,
+  AlertTriangle
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -27,6 +29,10 @@ export default function AcademicYears({ path, navigate }) {
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isCloning, setIsCloning] = useState(false)
+  const [deleteYear, setDeleteYear] = useState(null)
+  const [deleteConfirmLabel, setDeleteConfirmLabel] = useState("")
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteFeedback, setDeleteFeedback] = useState(null)
   
   const [formData, setFormData] = useState({
     label: "",
@@ -88,6 +94,40 @@ export default function AcademicYears({ path, navigate }) {
     }
   }
 
+  const openDeleteModal = (year) => {
+    if (year.is_current) return
+    setDeleteYear(year)
+    setDeleteConfirmLabel("")
+    setDeleteFeedback(null)
+  }
+
+  const closeDeleteModal = () => {
+    if (isDeleting) return
+    setDeleteYear(null)
+    setDeleteConfirmLabel("")
+  }
+
+  const handleDeleteYear = async () => {
+    if (!deleteYear || deleteConfirmLabel.trim() !== deleteYear.label) return
+
+    setIsDeleting(true)
+    setDeleteFeedback(null)
+
+    try {
+      const data = await apiRequest(`/api/years/${deleteYear.id}`, {
+        method: "DELETE"
+      })
+      setDeleteFeedback({ type: "success", text: data.message || "Academic year deleted" })
+      setDeleteYear(null)
+      setDeleteConfirmLabel("")
+      await fetchYears()
+    } catch (err) {
+      setDeleteFeedback({ type: "error", text: err.message })
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   const formatDate = (dateStr) => {
     return new Date(dateStr).toLocaleDateString('fr-FR', {
       day: '2-digit',
@@ -95,6 +135,11 @@ export default function AcademicYears({ path, navigate }) {
       year: 'numeric'
     })
   }
+
+  const deleteTooltip = (year) =>
+    year.is_current
+      ? "Impossible de supprimer l'année active. Définissez une autre année comme active avant de la supprimer."
+      : "Supprimer cette année"
 
   return (
     <DashboardShell
@@ -110,6 +155,19 @@ export default function AcademicYears({ path, navigate }) {
           Nouvelle année
         </Button>
       </div>
+
+      {deleteFeedback && (
+        <div
+          className={cn(
+            "mb-6 rounded-2xl border px-4 py-3 text-sm font-medium",
+            deleteFeedback.type === "success"
+              ? "border-accent/20 bg-accent/10 text-foreground"
+              : "border-destructive/20 bg-destructive/10 text-foreground"
+          )}
+        >
+          {deleteFeedback.text}
+        </div>
+      )}
 
       <div className="rounded-2xl border border-border bg-card overflow-x-auto custom-scrollbar shadow-sm">
         {/* Mobile Cards Layout */}
@@ -127,14 +185,28 @@ export default function AcademicYears({ path, navigate }) {
               <div key={year.id} className={cn("p-5 space-y-3 transition-colors", year.is_current && "bg-primary/[0.02]")}>
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-black text-foreground">{year.label}</p>
-                  {year.is_current ? (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-black uppercase tracking-wider">
-                      <CheckCircle2 className="size-3" />
-                      Actuelle
+                  <span className="inline-flex items-center gap-2">
+                    {year.is_current ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-black uppercase tracking-wider">
+                        <CheckCircle2 className="size-3" />
+                        Actuelle
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest">Archive</span>
+                    )}
+                    <span title={deleteTooltip(year)}>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => openDeleteModal(year)}
+                        disabled={year.is_current}
+                        className="h-8 rounded-xl px-3 text-[10px] font-black uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <Trash2 className="size-3 mr-1.5" />
+                        Supprimer
+                      </Button>
                     </span>
-                  ) : (
-                    <span className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest">Archive</span>
-                  )}
+                  </span>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
@@ -146,18 +218,31 @@ export default function AcademicYears({ path, navigate }) {
                     <span className="font-bold text-muted-foreground">{formatDate(year.end_date)}</span>
                   </div>
                 </div>
-                {!year.is_current && (
-                  <div className="pt-2 border-t border-border/50">
+                <div className="pt-2 border-t border-border/50">
+                  <div className="grid grid-cols-2 gap-2">
                     <Button 
                       variant="outline" 
                       size="sm" 
                       onClick={() => handleSetCurrent(year.id)}
-                      className="w-full text-[10px] font-black uppercase tracking-widest text-primary hover:bg-primary/10 rounded-xl"
+                      disabled={year.is_current}
+                      className="w-full text-[10px] font-black uppercase tracking-widest text-primary hover:bg-primary/10 rounded-xl disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      Définir comme actuelle
+                      {year.is_current ? "Déjà actuelle" : "Définir comme actuelle"}
                     </Button>
+                    <span title={deleteTooltip(year)}>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => openDeleteModal(year)}
+                        disabled={year.is_current}
+                        className="w-full text-[10px] font-black uppercase tracking-widest rounded-xl disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <Trash2 className="size-3 mr-1.5" />
+                        Supprimer
+                      </Button>
+                    </span>
                   </div>
-                )}
+                </div>
               </div>
             ))
           )}
@@ -210,16 +295,29 @@ export default function AcademicYears({ path, navigate }) {
                     )}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    {!year.is_current && (
+                    <div className="flex items-center justify-end gap-2">
                       <Button 
                         variant="ghost" 
                         size="sm" 
                         onClick={() => handleSetCurrent(year.id)}
-                        className="text-[10px] font-black uppercase tracking-widest text-primary hover:bg-primary/10"
+                        disabled={year.is_current}
+                        className="text-[10px] font-black uppercase tracking-widest text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed"
                       >
-                        Définir comme actuelle
+                        {year.is_current ? "Déjà actuelle" : "Définir comme actuelle"}
                       </Button>
-                    )}
+                      <span title={deleteTooltip(year)}>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => openDeleteModal(year)}
+                          disabled={year.is_current}
+                          className="text-[10px] font-black uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          <Trash2 className="size-3 mr-1.5" />
+                          Supprimer
+                        </Button>
+                      </span>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -304,6 +402,65 @@ export default function AcademicYears({ path, navigate }) {
                 </div>
                 </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Delete Modal */}
+      {deleteYear && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-md rounded-2xl border border-destructive/20 bg-card p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex items-start gap-3">
+              <div className="size-10 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
+                <AlertTriangle className="size-5 text-destructive" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-bold tracking-tight text-foreground">Supprimer l'année académique ?</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Cette action supprimera définitivement <span className="font-bold text-foreground">{deleteYear.label}</span> ainsi que toutes ses données associées.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 rounded-xl border border-border bg-muted/20 p-3">
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
+                Tapez exactement le label pour confirmer
+              </p>
+              <p className="mt-1 text-sm font-bold text-foreground">{deleteYear.label}</p>
+              <Input
+                value={deleteConfirmLabel}
+                onChange={(e) => setDeleteConfirmLabel(e.target.value)}
+                placeholder={deleteYear.label}
+                className="mt-3 rounded-xl font-bold"
+                autoComplete="off"
+                disabled={isDeleting}
+              />
+            </div>
+
+            {deleteFeedback && deleteFeedback.type === "error" && (
+              <div className="mt-4 rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-foreground">
+                {deleteFeedback.text}
+              </div>
+            )}
+
+            <div className="flex gap-3 mt-8">
+              <Button
+                variant="outline"
+                onClick={closeDeleteModal}
+                className="flex-1 rounded-xl font-bold uppercase tracking-widest text-[10px]"
+                disabled={isDeleting}
+              >
+                Annuler
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteYear}
+                className="flex-1 rounded-xl font-bold uppercase tracking-widest text-[10px]"
+                disabled={isDeleting || deleteConfirmLabel.trim() !== deleteYear.label}
+              >
+                {isDeleting ? "Suppression..." : "Supprimer"}
+              </Button>
+            </div>
           </div>
         </div>
       )}
