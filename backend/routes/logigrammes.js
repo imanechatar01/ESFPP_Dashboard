@@ -16,7 +16,13 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-const upload = multer({ dest: uploadDir });
+const upload = multer({
+  dest: uploadDir,
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50 MB par fichier
+    files: 10,                   // 10 fichiers max par requête
+  },
+});
 
 /**
  * Safely delete a file only if it is located inside the allowed uploadDir.
@@ -1030,299 +1036,343 @@ const importLimiter = rateLimit({
 });
 
 // POST /api/logigramme/import
-router.post('/import', importLimiter, upload.single('file'), async (req, res) => {
+router.post('/import', importLimiter, upload.array('files', 10), async (req, res) => {
   const { academic_year_id } = req.body;
   const replaceSchedule = req.body.replace_schedule === true || req.body.replace_schedule === 'true';
   const allowMerge = req.body.allow_merge === true || req.body.allow_merge === 'true';
-  const file = req.file;
+  const uploadedFiles = req.files || [];
 
   if (!academic_year_id) {
-    if (file) safeUnlink(file.path);
+    uploadedFiles.forEach(f => safeUnlink(f.path));
     return res.status(400).json({ error: 'academic_year_id est requis.' });
   }
 
-  if (!file) {
+  if (uploadedFiles.length === 0) {
     return res.status(400).json({ error: 'Aucun fichier téléchargé.' });
   }
+
   if (replaceSchedule && allowMerge) {
-    if (file) safeUnlink(file.path);
+    uploadedFiles.forEach(f => safeUnlink(f.path));
     return res.status(400).json({ error: 'Utilisez soit replace_schedule=true soit allow_merge=true, pas les deux.' });
   }
 
-  const filePath = file.path;
-
+  // Validate academic year once before processing files
+  let yearData, canonicalWeekDateMap;
   try {
-    // 1. Get all parsed sheets from Python parser in one pass
-    const pythonScriptPath = path.join(__dirname, '../scripts/parse_xls.py');
-    const parseResult = spawnSync('python3', [
-      pythonScriptPath,
-      '--file', filePath,
-      '--all-sheets'
-    ]);
-
-    if (parseResult.status !== 0 || !parseResult.stdout) {
-      const errorMsg = parseResult.stderr ? parseResult.stderr.toString() : 'Erreur inconnue du parseur.';
-      throw new Error(`Erreur parsing fichier Excel: ${errorMsg}`);
-    }
-
-    const pyStderr = parseResult.stderr?.toString().trim();
-    if (pyStderr) {
-      console.log(`[import] Python parser diagnostics:\n${pyStderr}`);
-    }
-
-    const allSheetsData = JSON.parse(parseResult.stdout.toString());
-    const sheets = Object.keys(allSheetsData);
-    const importedLogs = [];
-
-    // 2. Fetch academic year details
-    const { data: yearData, error: yearError } = await supabaseAdmin
+    const { data, error: yearError } = await supabaseAdmin
       .from('academic_years')
       .select('*')
       .eq('id', academic_year_id)
       .single();
 
-    if (yearError || !yearData) {
-      throw new Error(`Année académique introuvable : ${yearError?.message || 'inconnue'}`);
+    if (yearError || !data) {
+      uploadedFiles.forEach(f => safeUnlink(f.path));
+      return res.status(400).json({ error: `Année académique introuvable : ${yearError?.message || 'inconnue'}` });
     }
-
-    const canonicalWeekDateMap = await getYearWeekDateMap(academic_year_id);
-
-    // 3. Process each sheet (excluding Feuil1)
-    for (const sheetName of sheets) {
-      if (sheetName === 'Feuil1') continue;
-
-      const data = allSheetsData[sheetName];
-      const { metadata, unites, weeks } = data;
-
-      if (!metadata.filiere || !metadata.classe) {
-        throw new Error(`Feuille "${sheetName}": filière ou classe manquante.`);
-      }
-
-      if (unites.length === 0) {
-        throw new Error(`Feuille "${sheetName}": 0 unité détectée. Import annulé pour éviter une perte de données.`);
-      }
-
-      // a. Upsert Filière
-      const filiereName = metadata.filiere.trim();
-      const FILIERE_CODES = {
-        'aide-soignant': 'AS',
-        'aide soignant': 'AS',
-        'infirmier en réanimation': 'REA',
-        'infirmier en reanimation': 'REA',
-        'infirmier anesthésiste': 'IAN',
-        'infirmier anesthesiste': 'IAN',
-        'infirmier auxiliaire': 'IA',
-        'infirmier polyvalent': 'IP',
-        'radiologie': 'RADIO',
-      };
-      const filiereCode = FILIERE_CODES[filiereName.toLowerCase()] || filiereName.substring(0, 5).toUpperCase().trim();
-      
-      const { data: filData, error: filError } = await supabaseAdmin
-        .from('filieres')
-        .upsert({ 
-          code: filiereCode, 
-          name: filiereName, 
-          niveau: metadata.niveau.trim() || 'QUALIFICATION'
-        }, { onConflict: 'code' })
-        .select()
-        .single();
-
-      if (filError) throw filError;
-      const filiereId = filData.id;
-
-      // b. Upsert Classe
-      let annee = 1;
-      if (metadata.classe.includes('2')) annee = 2;
-      if (metadata.classe.includes('3')) annee = 3;
-
-      const { data: clData, error: clError } = await supabaseAdmin
-        .from('classes')
-        .upsert({
-          filiere_id: filiereId,
-          label: metadata.classe,
-          annee: annee
-        }, { onConflict: 'filiere_id, annee' })
-        .select()
-        .single();
-
-      if (clError) throw clError;
-      const classeId = clData.id;
-
-      // c. Upsert Logigramme
-      const { data: logData, error: logError } = await supabaseAdmin
-        .from('logigrammes')
-        .upsert({
-          filiere_id: filiereId,
-          classe_id: classeId,
-          academic_year_id: academic_year_id
-        }, { onConflict: 'filiere_id, classe_id, academic_year_id' })
-        .select()
-        .single();
-
-      if (logError) throw logError;
-      const logigrammeId = logData.id;
-
-      const { data: existingUnits, error: existingUnitsError } = await supabaseAdmin
-        .from('unites_formation')
-        .select('id')
-        .eq('logigramme_id', logigrammeId);
-
-      if (existingUnitsError) throw existingUnitsError;
-      if ((existingUnits || []).length > 0 && !replaceSchedule && !allowMerge) {
-        const conflictError = new Error("SCHEDULE_CONFLICT");
-        conflictError.code = "SCHEDULE_CONFLICT";
-        conflictError.filiere = filiereName;
-        conflictError.classe = metadata.classe;
-        throw conflictError;
-      }
-
-      if ((existingUnits || []).length > 0 && replaceSchedule) {
-        const { error: deleteUnitsError } = await supabaseAdmin
-          .from('unites_formation')
-          .delete()
-          .eq('logigramme_id', logigrammeId);
-        if (deleteUnitsError) throw deleteUnitsError;
-      }
-
-      // d. Insert year_weeks (batch)
-      const weekDateMap = { ...canonicalWeekDateMap };
-      const yearWeeksToInsert = [];
-      for (let i = 0; i < weeks.length; i++) {
-        const weekDate = weeks[i];
-        if (!weekDate) continue;
-        
-        const dateObj = new Date(weekDate);
-        const mois = dateObj.toLocaleString('fr-FR', { month: 'long' });
-        const semestre = (i + 1) <= 26 ? 1 : 2;
-
-        yearWeeksToInsert.push({
-          academic_year_id: academic_year_id,
-          semaine: i + 1,
-          week_start_date: weekDate,
-          mois: mois.charAt(0).toUpperCase() + mois.slice(1),
-          semestre: semestre
-        });
-        
-        weekDateMap[i + 1] = weekDate;
-        canonicalWeekDateMap[i + 1] = weekDate;
-      }
-
-      if (yearWeeksToInsert.length > 0) {
-        const { error: ywError } = await supabaseAdmin
-          .from('year_weeks')
-          .upsert(yearWeeksToInsert, { onConflict: 'academic_year_id, semaine' });
-        if (ywError) throw ywError;
-      }
-
-      // e. Process Formateurs (batch)
-      const formateurNames = [...new Set(unites.map(u => u.formateur).filter(f => f && String(f).trim() !== ''))];
-      const formateurMap = {};
-      
-      if (formateurNames.length > 0) {
-        const { data: existingF, error: sError } = await supabaseAdmin
-          .from('formateurs')
-          .select('id, nom')
-          .in('nom', formateurNames);
-          
-        if (sError) throw sError;
-        
-        (existingF || []).forEach(f => formateurMap[f.nom] = f.id);
-        
-        const missingFormateurs = formateurNames.filter(name => !formateurMap[name]);
-        if (missingFormateurs.length > 0) {
-          const { data: newF, error: iError } = await supabaseAdmin
-            .from('formateurs')
-            .insert(missingFormateurs.map(nom => ({ nom })))
-            .select('id, nom');
-            
-          if (iError) throw iError;
-          (newF || []).forEach(f => formateurMap[f.nom] = f.id);
-        }
-      }
-
-      // f. Upsert Unités (batch)
-      const unitsToUpsert = unites.map(unit => ({
-        logigramme_id: logigrammeId,
-        ordre: unit.ordre,
-        nom: unit.nom,
-        formateur_id: (unit.formateur && formateurMap[unit.formateur]) ? formateurMap[unit.formateur] : null,
-        vhg: unit.vhg
-      }));
-
-      const { data: upsertedUnits, error: uError } = await supabaseAdmin
-        .from('unites_formation')
-        .upsert(unitsToUpsert, { onConflict: 'logigramme_id, ordre' })
-        .select('id, ordre');
-
-      if (uError) throw uError;
-
-      const unitIdMap = {};
-      (upsertedUnits || []).forEach(u => unitIdMap[u.ordre] = u.id);
-
-      // g. Upsert Cells (batch)
-      let allCellInserts = [];
-      for (const unit of unites) {
-        const uniteId = unitIdMap[unit.ordre];
-        if (unit.cells && unit.cells.length > 0) {
-          const cellInserts = unit.cells.map(c => ({
-            unite_id: uniteId,
-            semaine: c.week,
-            week_start_date: weekDateMap[c.week],
-            cell_type: c.type,
-            heures: (Number.isFinite(Number(c.value)) && Number(c.value) > 0) ? Number(c.value) : null
-          })).filter(c => c.week_start_date); // Safety check
-
-          if (cellInserts.length < unit.cells.length) {
-            throw new Error(
-              `Unité "${unit.nom}" / feuille "${sheetName}": ` +
-              `${unit.cells.length - cellInserts.length}/${unit.cells.length} cellule(s) sans date semaine. Import annulé.`
-            );
-          }
-          
-          allCellInserts.push(...cellInserts);
-        }
-      }
-
-      if (allCellInserts.length > 0) {
-        const CHUNK_SIZE = 500;
-        for (let i = 0; i < allCellInserts.length; i += CHUNK_SIZE) {
-          const chunk = allCellInserts.slice(i, i + CHUNK_SIZE);
-          const { error: cellError } = await supabaseAdmin
-            .from('week_cells')
-            .upsert(chunk, { onConflict: 'unite_id, semaine' });
-          if (cellError) throw cellError;
-        }
-      }
-
-      importedLogs.push({
-        sheetName,
-        filiere: filiereName,
-        classe: metadata.classe,
-        unitsCount: unites.length
-      });
-    }
-
-    res.json({
-      success: true,
-      message: `Importation réussie de ${importedLogs.length} programmes.`,
-      importedLogs
-    });
-
+    yearData = data;
+    canonicalWeekDateMap = await getYearWeekDateMap(academic_year_id);
   } catch (err) {
-    console.error('Import error:', err);
-    if (err.code === "SCHEDULE_CONFLICT") {
-      return res.status(409).json({
-        error: "SCHEDULE_CONFLICT",
-        code: err.code,
-        filiere: err.filiere,
-        classe: err.classe
-      });
-    }
-    res.status(500).json({ error: err.message });
-  } finally {
-    // Always clean up uploaded file — safeUnlink validates path stays inside uploadDir
-    safeUnlink(filePath);
+    uploadedFiles.forEach(f => safeUnlink(f.path));
+    return res.status(500).json({ error: err.message });
   }
+
+  const pythonScriptPath = path.join(__dirname, '../scripts/parse_xls.py');
+
+  // Process each file sequentially, capturing per-file results
+  const results = [];
+
+  for (const fileEntry of uploadedFiles) {
+    const fileName = fileEntry.originalname;
+    const filePath = fileEntry.path;
+
+    try {
+      // 1. Parse all sheets from this file in one Python pass
+      const parseResult = spawnSync('python3', [
+        pythonScriptPath,
+        '--file', filePath,
+        '--all-sheets'
+      ]);
+
+      if (parseResult.status !== 0 || !parseResult.stdout) {
+        const errorMsg = parseResult.stderr ? parseResult.stderr.toString().trim() : 'Erreur inconnue du parseur.';
+        results.push({ fileName, status: 'error', error: errorMsg });
+        continue;
+      }
+
+      const pyStderr = parseResult.stderr?.toString().trim();
+      if (pyStderr) {
+        console.log(`[import] Python parser diagnostics for '${fileName}':\n${pyStderr}`);
+      }
+
+      let allSheetsData;
+      try {
+        allSheetsData = JSON.parse(parseResult.stdout.toString());
+      } catch {
+        results.push({ fileName, status: 'error', error: 'Réponse du parseur invalide (JSON malformé).' });
+        continue;
+      }
+
+      const sheets = Object.keys(allSheetsData);
+      if (sheets.length === 0) {
+        results.push({ fileName, status: 'error', error: 'Aucune feuille valide trouvée dans ce fichier.' });
+        continue;
+      }
+
+      const importedLogs = [];
+      // Track if a conflict was raised for this file so we can still report partial success
+      let fileConflict = null;
+
+      // 2. Process each sheet (excluding Feuil1)
+      for (const sheetName of sheets) {
+        if (sheetName === 'Feuil1') continue;
+
+        const data = allSheetsData[sheetName];
+        const { metadata, unites, weeks } = data;
+
+        if (!metadata.filiere || !metadata.classe) {
+          throw new Error(`Feuille "${sheetName}": filière ou classe manquante.`);
+        }
+
+        if (unites.length === 0) {
+          throw new Error(`Feuille "${sheetName}": 0 unité détectée. Import annulé pour éviter une perte de données.`);
+        }
+
+        // a. Upsert Filière
+        const filiereName = metadata.filiere.trim();
+        const FILIERE_CODES = {
+          'aide-soignant': 'AS',
+          'aide soignant': 'AS',
+          'infirmier en réanimation': 'REA',
+          'infirmier en reanimation': 'REA',
+          'infirmier anesthésiste': 'IAN',
+          'infirmier anesthesiste': 'IAN',
+          'infirmier auxiliaire': 'IA',
+          'infirmier polyvalent': 'IP',
+          'radiologie': 'RADIO',
+        };
+        const filiereCode = FILIERE_CODES[filiereName.toLowerCase()] || filiereName.substring(0, 5).toUpperCase().trim();
+
+        const { data: filData, error: filError } = await supabaseAdmin
+          .from('filieres')
+          .upsert({
+            code: filiereCode,
+            name: filiereName,
+            niveau: metadata.niveau.trim() || 'QUALIFICATION'
+          }, { onConflict: 'code' })
+          .select()
+          .single();
+
+        if (filError) throw filError;
+        const filiereId = filData.id;
+
+        // b. Upsert Classe
+        let annee = 1;
+        if (metadata.classe.includes('2')) annee = 2;
+        if (metadata.classe.includes('3')) annee = 3;
+
+        const { data: clData, error: clError } = await supabaseAdmin
+          .from('classes')
+          .upsert({
+            filiere_id: filiereId,
+            label: metadata.classe,
+            annee: annee
+          }, { onConflict: 'filiere_id, annee' })
+          .select()
+          .single();
+
+        if (clError) throw clError;
+        const classeId = clData.id;
+
+        // c. Upsert Logigramme
+        const { data: logData, error: logError } = await supabaseAdmin
+          .from('logigrammes')
+          .upsert({
+            filiere_id: filiereId,
+            classe_id: classeId,
+            academic_year_id: academic_year_id
+          }, { onConflict: 'filiere_id, classe_id, academic_year_id' })
+          .select()
+          .single();
+
+        if (logError) throw logError;
+        const logigrammeId = logData.id;
+
+        const { data: existingUnits, error: existingUnitsError } = await supabaseAdmin
+          .from('unites_formation')
+          .select('id')
+          .eq('logigramme_id', logigrammeId);
+
+        if (existingUnitsError) throw existingUnitsError;
+
+        if ((existingUnits || []).length > 0 && !replaceSchedule && !allowMerge) {
+          // Conflict for this sheet — record it and skip remaining sheets in this file
+          fileConflict = { filiere: filiereName, classe: metadata.classe };
+          break;
+        }
+
+        if ((existingUnits || []).length > 0 && replaceSchedule) {
+          const { error: deleteUnitsError } = await supabaseAdmin
+            .from('unites_formation')
+            .delete()
+            .eq('logigramme_id', logigrammeId);
+          if (deleteUnitsError) throw deleteUnitsError;
+        }
+
+        // d. Insert year_weeks (batch)
+        const weekDateMap = { ...canonicalWeekDateMap };
+        const yearWeeksToInsert = [];
+        for (let i = 0; i < weeks.length; i++) {
+          const weekDate = weeks[i];
+          if (!weekDate) continue;
+
+          const dateObj = new Date(weekDate);
+          const mois = dateObj.toLocaleString('fr-FR', { month: 'long' });
+          const semestre = (i + 1) <= 26 ? 1 : 2;
+
+          yearWeeksToInsert.push({
+            academic_year_id: academic_year_id,
+            semaine: i + 1,
+            week_start_date: weekDate,
+            mois: mois.charAt(0).toUpperCase() + mois.slice(1),
+            semestre: semestre
+          });
+
+          weekDateMap[i + 1] = weekDate;
+          canonicalWeekDateMap[i + 1] = weekDate;
+        }
+
+        if (yearWeeksToInsert.length > 0) {
+          const { error: ywError } = await supabaseAdmin
+            .from('year_weeks')
+            .upsert(yearWeeksToInsert, { onConflict: 'academic_year_id, semaine' });
+          if (ywError) throw ywError;
+        }
+
+        // e. Process Formateurs (batch)
+        const formateurNames = [...new Set(unites.map(u => u.formateur).filter(f => f && String(f).trim() !== ''))];
+        const formateurMap = {};
+
+        if (formateurNames.length > 0) {
+          const { data: existingF, error: sError } = await supabaseAdmin
+            .from('formateurs')
+            .select('id, nom')
+            .in('nom', formateurNames);
+
+          if (sError) throw sError;
+
+          (existingF || []).forEach(f => formateurMap[f.nom] = f.id);
+
+          const missingFormateurs = formateurNames.filter(name => !formateurMap[name]);
+          if (missingFormateurs.length > 0) {
+            const { data: newF, error: iError } = await supabaseAdmin
+              .from('formateurs')
+              .insert(missingFormateurs.map(nom => ({ nom })))
+              .select('id, nom');
+
+            if (iError) throw iError;
+            (newF || []).forEach(f => formateurMap[f.nom] = f.id);
+          }
+        }
+
+        // f. Upsert Unités (batch)
+        const unitsToUpsert = unites.map(unit => ({
+          logigramme_id: logigrammeId,
+          ordre: unit.ordre,
+          nom: unit.nom,
+          formateur_id: (unit.formateur && formateurMap[unit.formateur]) ? formateurMap[unit.formateur] : null,
+          vhg: unit.vhg
+        }));
+
+        const { data: upsertedUnits, error: uError } = await supabaseAdmin
+          .from('unites_formation')
+          .upsert(unitsToUpsert, { onConflict: 'logigramme_id, ordre' })
+          .select('id, ordre');
+
+        if (uError) throw uError;
+
+        const unitIdMap = {};
+        (upsertedUnits || []).forEach(u => unitIdMap[u.ordre] = u.id);
+
+        // g. Upsert Cells (batch)
+        const allCellInserts = [];
+        for (const unit of unites) {
+          const uniteId = unitIdMap[unit.ordre];
+          if (unit.cells && unit.cells.length > 0) {
+            const cellInserts = unit.cells.map(c => ({
+              unite_id: uniteId,
+              semaine: c.week,
+              week_start_date: weekDateMap[c.week],
+              cell_type: c.type,
+              heures: (Number.isFinite(Number(c.value)) && Number(c.value) > 0) ? Number(c.value) : null
+            })).filter(c => c.week_start_date);
+
+            if (cellInserts.length < unit.cells.length) {
+              throw new Error(
+                `Unité "${unit.nom}" / feuille "${sheetName}": ` +
+                `${unit.cells.length - cellInserts.length}/${unit.cells.length} cellule(s) sans date semaine. Import annulé.`
+              );
+            }
+
+            allCellInserts.push(...cellInserts);
+          }
+        }
+
+        if (allCellInserts.length > 0) {
+          const CHUNK_SIZE = 500;
+          for (let i = 0; i < allCellInserts.length; i += CHUNK_SIZE) {
+            const chunk = allCellInserts.slice(i, i + CHUNK_SIZE);
+            const { error: cellError } = await supabaseAdmin
+              .from('week_cells')
+              .upsert(chunk, { onConflict: 'unite_id, semaine' });
+            if (cellError) throw cellError;
+          }
+        }
+
+        importedLogs.push({
+          sheetName,
+          filiere: filiereName,
+          classe: metadata.classe,
+          unitsCount: unites.length
+        });
+      } // end sheet loop
+
+      // Build per-file result
+      if (fileConflict) {
+        results.push({
+          fileName,
+          status: 'conflict',
+          code: 'SCHEDULE_CONFLICT',
+          filiere: fileConflict.filiere,
+          classe: fileConflict.classe,
+        });
+      } else {
+        results.push({
+          fileName,
+          status: 'success',
+          message: `${importedLogs.length} programme(s) importé(s).`,
+          importedLogs,
+        });
+      }
+
+    } catch (err) {
+      console.error(`[import] Error processing file '${fileName}':`, err);
+      results.push({
+        fileName,
+        status: 'error',
+        error: err.message,
+      });
+    } finally {
+      // Always clean up this file's temp copy
+      safeUnlink(filePath);
+    }
+  } // end file loop
+
+  const successCount = results.filter(r => r.status === 'success').length;
+  res.json({
+    success: true,
+    message: `Traitement terminé : ${successCount}/${results.length} fichier(s) importé(s) avec succès.`,
+    results,
+  });
 });
 
 export default router;
