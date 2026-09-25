@@ -2,8 +2,15 @@
 // Manages a single WebSocket connection to the backend for real-time notifications.
 // The connection is lazy (created on first call to connect()) and auto-reconnects.
 import { supabase } from '@/supabaseClient';
+import { API_URL } from '@/lib/api';
 
-const WS_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:3001').replace(/^http/, 'ws');
+function getWsBaseUrl() {
+  const baseUrl = new URL(API_URL, typeof window !== 'undefined' ? window.location.origin : 'http://localhost')
+  const wsProtocol = baseUrl.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${wsProtocol}//${baseUrl.host}`
+}
+
+const WS_BASE = getWsBaseUrl();
 
 let ws = null;
 let reconnectTimer = null;
