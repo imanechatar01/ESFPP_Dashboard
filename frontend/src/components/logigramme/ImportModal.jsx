@@ -1,12 +1,10 @@
 import { useState, useEffect } from "react"
 import { supabase } from "@/supabaseClient"
-import { apiRequest } from "@/lib/api"
+import { API_URL, apiRequest } from "@/lib/api"
 import { X, Upload, FileSpreadsheet, Loader2, Check, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001"
 
 export function ImportModal({ isOpen, onClose, onImportSuccess }) {
   const [academicYears, setAcademicYears] = useState([])

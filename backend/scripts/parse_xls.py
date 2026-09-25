@@ -570,7 +570,7 @@ if __name__ == "__main__":
     parser.add_argument("--file", required=True, help="Path to the .xls file")
     parser.add_argument("--sheet", help="Sheet name to parse (single sheet mode)")
     parser.add_argument("--list-sheets", action="store_true", help="List valid sheet names as JSON")
-    parser.add_argument("--dry-run", action="store_true", help="Audit all sheets without persisting")
+    parser.add_argument("--all-sheets", action="store_true", help="Parse all valid sheets and return a JSON dict")
     args = parser.parse_args()
 
     if args.list_sheets:
@@ -587,6 +587,24 @@ if __name__ == "__main__":
             print(json.dumps(valid_sheets))
         except Exception as e:
             print(f"Error listing sheets: {e}", file=sys.stderr)
+            sys.exit(1)
+
+    elif args.all_sheets:
+        try:
+            book = xlrd.open_workbook(args.file, formatting_info=True)
+            result = {}
+            for sheet_name in book.sheet_names():
+                sheet = book.sheet_by_name(sheet_name)
+                is_valid, reason = is_valid_logigramme_sheet(sheet)
+                if not is_valid:
+                    print(f"Skipping recap/utility sheet '{sheet_name}': {reason}", file=sys.stderr)
+                    continue
+                data = parse_xls(args.file, sheet_name, book=book)
+                if data:
+                    result[sheet_name] = data
+            print(json.dumps(result, ensure_ascii=False))
+        except Exception as e:
+            print(f"Error parsing all sheets: {e}", file=sys.stderr)
             sys.exit(1)
 
     elif args.dry_run:
@@ -686,5 +704,5 @@ if __name__ == "__main__":
         else:
             sys.exit(1)
     else:
-        print("Either --sheet, --dry-run or --list-sheets is required", file=sys.stderr)
+        print("Either --sheet, --all-sheets, --dry-run or --list-sheets is required", file=sys.stderr)
         sys.exit(1)
