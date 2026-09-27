@@ -4,6 +4,7 @@
   },
   "dependencies": {
     "express-rate-limit": "^8.6.2",
+    "qs": "^6.16.0",
     "react-router-dom": "^7.18.2"
   }
 }
