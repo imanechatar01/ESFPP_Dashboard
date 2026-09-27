@@ -1355,7 +1355,7 @@ router.post('/import', importLimiter, upload.array('files', 10), async (req, res
       }
 
     } catch (err) {
-      console.error(`[import] Error processing file '${fileName}':`, err);
+      console.error("[import] Error processing file '%s':", fileName, err);
       results.push({
         fileName,
         status: 'error',
