@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { supabase } from "@/supabaseClient"
 import { API_URL, apiRequest } from "@/lib/api"
-import { X, Upload, FileSpreadsheet, Loader2, Check, AlertCircle } from "lucide-react"
+import { X, Upload, FileSpreadsheet, Loader2, Check, AlertCircle, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
@@ -9,24 +9,20 @@ import { cn } from "@/lib/utils"
 export function ImportModal({ isOpen, onClose, onImportSuccess }) {
   const [academicYears, setAcademicYears] = useState([])
   const [selectedYearId, setSelectedYearId] = useState("")
-  const [file, setFile] = useState(null)
+  const [files, setFiles] = useState([])
   const [dragActive, setDragActive] = useState(false)
-  
+
   const [loadingYears, setLoadingYears] = useState(false)
   const [importing, setImporting] = useState(false)
   const [error, setError] = useState(null)
-  const [conflict, setConflict] = useState(null)
-  const [successData, setSuccessData] = useState(null)
-  const [confirmReplace, setConfirmReplace] = useState(false)
+  const [results, setResults] = useState(null) // null = not done yet, Array = done
 
   useEffect(() => {
     if (isOpen) {
       fetchAcademicYears()
-      setFile(null)
+      setFiles([])
       setError(null)
-      setConflict(null)
-      setConfirmReplace(false)
-      setSuccessData(null)
+      setResults(null)
     }
   }, [isOpen])
 
@@ -35,8 +31,6 @@ export function ImportModal({ isOpen, onClose, onImportSuccess }) {
     try {
       const res = await apiRequest("/api/years")
       setAcademicYears(res)
-      
-      // Auto-select current year if available
       const currentYear = res.find(y => y.is_current)
       if (currentYear) {
         setSelectedYearId(currentYear.id)
@@ -51,63 +45,64 @@ export function ImportModal({ isOpen, onClose, onImportSuccess }) {
     }
   }
 
+  const addFiles = (newFiles) => {
+    const xlsFiles = Array.from(newFiles).filter(f => f.name.endsWith(".xls"))
+    const rejected = Array.from(newFiles).filter(f => !f.name.endsWith(".xls"))
+    if (rejected.length > 0) {
+      setError(`${rejected.length} fichier(s) ignoré(s) : seuls les .xls sont acceptés.`)
+    } else {
+      setError(null)
+    }
+    if (xlsFiles.length === 0) return
+    // Deduplicate by name
+    setFiles(prev => {
+      const existingNames = new Set(prev.map(f => f.name))
+      const toAdd = xlsFiles.filter(f => !existingNames.has(f.name))
+      return [...prev, ...toAdd]
+    })
+  }
+
+  const removeFile = (name) => {
+    setFiles(prev => prev.filter(f => f.name !== name))
+  }
+
   const handleDrag = (e) => {
     e.preventDefault()
     e.stopPropagation()
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true)
-    } else if (e.type === "dragleave") {
-      setDragActive(false)
-    }
+    if (e.type === "dragenter" || e.type === "dragover") setDragActive(true)
+    else if (e.type === "dragleave") setDragActive(false)
   }
 
   const handleDrop = (e) => {
     e.preventDefault()
     e.stopPropagation()
     setDragActive(false)
-    
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const droppedFile = e.dataTransfer.files[0]
-      if (droppedFile.name.endsWith(".xls")) {
-        setFile(droppedFile)
-        setError(null)
-        setConflict(null)
-        setConfirmReplace(false)
-      } else {
-        setError("Seuls les fichiers Excel au format .xls sont supportés.")
-      }
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      addFiles(e.dataTransfer.files)
     }
   }
 
   const handleFileChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      const selectedFile = e.target.files[0]
-      if (selectedFile.name.endsWith(".xls")) {
-        setFile(selectedFile)
-        setError(null)
-        setConflict(null)
-        setConfirmReplace(false)
-      } else {
-        setError("Seuls les fichiers Excel au format .xls sont supportés.")
-      }
+    if (e.target.files && e.target.files.length > 0) {
+      addFiles(e.target.files)
+      // Reset input so the same file can be re-added after removal
+      e.target.value = ""
     }
   }
 
-  const handleUpload = async (flags = {}) => {
+  const handleUpload = async () => {
     if (!selectedYearId) {
       setError("Veuillez sélectionner une année académique.")
       return
     }
-    if (!file) {
-      setError("Veuillez sélectionner un fichier.")
+    if (files.length === 0) {
+      setError("Veuillez sélectionner au moins un fichier.")
       return
     }
 
     setImporting(true)
     setError(null)
-    setConflict(null)
-    setConfirmReplace(false)
-    setSuccessData(null)
+    setResults(null)
 
     try {
       const { data } = await supabase.auth.getSession()
@@ -115,10 +110,7 @@ export function ImportModal({ isOpen, onClose, onImportSuccess }) {
 
       const formData = new FormData()
       formData.append("academic_year_id", selectedYearId)
-      formData.append("file", file)
-      
-      if (flags.replace_schedule) formData.append("replace_schedule", "true")
-      if (flags.allow_merge) formData.append("allow_merge", "true")
+      files.forEach(f => formData.append("files", f))
 
       const response = await fetch(`${API_URL}/api/logigramme/import`, {
         method: "POST",
@@ -129,14 +121,10 @@ export function ImportModal({ isOpen, onClose, onImportSuccess }) {
       const payload = await response.json().catch(() => ({}))
 
       if (!response.ok) {
-        if (payload.error === "SCHEDULE_CONFLICT") {
-          setConflict(payload)
-          return
-        }
         throw new Error(payload.error || "L'importation a échoué.")
       }
 
-      setSuccessData(payload)
+      setResults(payload.results || [])
       if (onImportSuccess) {
         onImportSuccess()
       }
@@ -149,23 +137,26 @@ export function ImportModal({ isOpen, onClose, onImportSuccess }) {
 
   if (!isOpen) return null
 
+  const successCount = results ? results.filter(r => r.status === "success").length : 0
+  const hasAnySuccess = successCount > 0
+
   return (
     <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl medical-glass animate-in zoom-in-95 duration-200">
-        
+
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="text-lg font-bold tracking-tight text-foreground flex items-center gap-2">
               <FileSpreadsheet className="size-5 text-primary" />
-              Importer un logigramme
+              Importer des logigrammes
             </h3>
             <p className="text-xs text-muted-foreground font-medium mt-1">
-              Importez vos fichiers d'organisation horaire au format .xls.
+              Importez un ou plusieurs fichiers d'organisation horaire au format .xls.
             </p>
           </div>
-          <button 
-            onClick={onClose} 
+          <button
+            onClick={onClose}
             className="p-2 rounded-full hover:bg-muted transition-colors"
             disabled={importing}
           >
@@ -173,93 +164,72 @@ export function ImportModal({ isOpen, onClose, onImportSuccess }) {
           </button>
         </div>
 
-        {/* Content */}
-        {conflict ? (
-          <div className="space-y-5 animate-in slide-in-from-right-4 duration-200">
-            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex flex-col items-center text-center gap-3">
-              <div className="size-12 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-600">
-                <AlertCircle className="size-6" />
+        {/* Results screen */}
+        {results ? (
+          <div className="space-y-4 animate-in zoom-in-95 duration-200">
+            <div className="flex flex-col items-center text-center py-2">
+              <div className="size-14 rounded-full bg-status-done/10 text-accent flex items-center justify-center mb-3 shadow-sm">
+                <Check className="size-7" />
               </div>
-              <div>
-                <h4 className="text-sm font-bold text-amber-900">
-                  Un planning existe déjà
-                </h4>
-                <p className="text-xs font-semibold text-amber-800 mt-1">
-                  {conflict.filiere} / {conflict.classe}
-                </p>
-                <p className="text-[11px] font-medium text-amber-700/80 mt-2">
-                  Des unités de formation sont déjà enregistrées pour cette classe. Que souhaitez-vous faire des nouvelles données du fichier ?
-                </p>
-              </div>
+              <h4 className="text-base font-bold text-foreground">Traitement terminé</h4>
+              <p className="text-xs text-muted-foreground font-medium mt-1">
+                {successCount}/{results.length} fichier(s) importé(s) avec succès.
+              </p>
             </div>
 
-            {confirmReplace ? (
-              <div className="p-4 rounded-xl border border-destructive/30 bg-destructive/5 space-y-3 animate-in fade-in zoom-in-95">
-                <p className="text-xs font-bold text-destructive text-center">
-                  ⚠️ Cette action est irréversible et supprimera toutes les données actuelles de cette classe avant d'importer les nouvelles.
-                </p>
-                <div className="flex gap-2">
-                  <Button 
-                    variant="outline"
-                    onClick={() => setConfirmReplace(false)}
-                    className="flex-1 rounded-xl text-[10px] font-bold uppercase tracking-widest border-destructive/20 hover:bg-destructive/10 text-destructive"
-                    disabled={importing}
-                  >
-                    Retour
-                  </Button>
-                  <Button 
-                    onClick={() => handleUpload({ replace_schedule: true })}
-                    className="flex-1 rounded-xl text-[10px] font-bold uppercase tracking-widest bg-destructive hover:bg-destructive/90 text-white"
-                    disabled={importing}
-                  >
-                    {importing ? <Loader2 className="size-3.5 animate-spin" /> : "Confirmer le remplacement"}
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <button
-                  onClick={() => handleUpload({ allow_merge: true })}
-                  disabled={importing}
-                  className="w-full text-left p-4 rounded-xl border border-border hover:border-primary/50 hover:bg-primary/5 transition-all group cursor-pointer"
-                >
-                  <p className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">
-                    Fusionner avec l'existant
-                  </p>
-                  <p className="text-[11px] font-medium text-muted-foreground mt-1">
-                    Ajoute ou met à jour uniquement les semaines correspondantes. Ne supprime aucune donnée existante.
-                  </p>
-                </button>
-                
-                <button
-                  onClick={() => setConfirmReplace(true)}
-                  disabled={importing}
-                  className="w-full text-left p-4 rounded-xl border border-border hover:border-destructive/50 hover:bg-destructive/5 transition-all group cursor-pointer"
-                >
-                  <p className="text-sm font-bold text-foreground group-hover:text-destructive transition-colors">
-                    Remplacer le planning existant
-                  </p>
-                  <p className="text-[11px] font-medium text-muted-foreground mt-1">
-                    Écrase la totalité du planning actuel pour cette classe avec les données du fichier.
-                  </p>
-                </button>
-              </div>
-            )}
+            <div className="max-h-[240px] overflow-y-auto border border-border rounded-xl divide-y divide-border bg-background/50 custom-scrollbar">
+              {results.map((r, i) => (
+                <div key={i} className="p-3 text-[11px] font-semibold">
+                  {/* File name */}
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-bold text-foreground truncate max-w-[260px]">{r.fileName}</span>
+                    <span className={cn(
+                      "px-2 py-0.5 rounded-md uppercase text-[9px] font-black tracking-wide",
+                      r.status === "success" && "bg-accent/10 text-accent",
+                      r.status === "conflict" && "bg-amber-500/10 text-amber-700",
+                      r.status === "error" && "bg-destructive/10 text-destructive",
+                    )}>
+                      {r.status === "success" && "Succès"}
+                      {r.status === "conflict" && "Conflit"}
+                      {r.status === "error" && "Erreur"}
+                    </span>
+                  </div>
 
-            {!confirmReplace && (
-              <Button 
-                variant="outline" 
-                onClick={() => { setConflict(null); setError(null); }} 
-                className="w-full rounded-xl font-bold uppercase tracking-widest text-[10px]"
-                disabled={importing}
-              >
-                Annuler
-              </Button>
-            )}
+                  {/* Success: list programmes */}
+                  {r.status === "success" && r.importedLogs?.length > 0 && (
+                    <div className="mt-1.5 space-y-1 pl-1 border-l-2 border-accent/30">
+                      {r.importedLogs.map((log, j) => (
+                        <div key={j} className="flex items-center justify-between">
+                          <span className="text-foreground/80">{log.filiere} — <span className="text-muted-foreground/60">{log.classe}</span></span>
+                          <span className="px-1.5 py-0.5 bg-primary/10 text-primary text-[9px] rounded font-bold">{log.unitsCount} unités</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Conflict: show filiere/classe */}
+                  {r.status === "conflict" && (
+                    <p className="text-amber-700/80 mt-1 pl-1 border-l-2 border-amber-400/40">
+                      Planning existant pour <strong>{r.filiere}</strong> / {r.classe}. Réimportez ce fichier seul pour remplacer ou fusionner.
+                    </p>
+                  )}
+
+                  {/* Error: show message */}
+                  {r.status === "error" && (
+                    <p className="text-destructive/80 mt-1 pl-1 border-l-2 border-destructive/30 break-words">{r.error}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <Button onClick={onClose} className="w-full rounded-xl font-bold uppercase tracking-widest text-[10px]">
+              Fermer
+            </Button>
           </div>
-        ) : !successData ? (
+        ) : (
+          /* Upload form */
           <div className="space-y-4">
-            
+
             {/* Year selector */}
             <div className="space-y-2">
               <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
@@ -289,18 +259,18 @@ export function ImportModal({ isOpen, onClose, onImportSuccess }) {
             {/* Drag & Drop Area */}
             <div className="space-y-2">
               <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
-                Fichier de planification (.xls uniquement)
+                Fichiers de planification (.xls uniquement)
               </Label>
-              
+
               <div
                 onDragEnter={handleDrag}
                 onDragOver={handleDrag}
                 onDragLeave={handleDrag}
                 onDrop={handleDrop}
                 className={cn(
-                  "relative border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center gap-3 transition-all cursor-pointer",
+                  "relative border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center gap-3 transition-all cursor-pointer",
                   dragActive ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 bg-background/50",
-                  file && "border-accent/50 bg-status-done/5"
+                  files.length > 0 && "border-accent/50 bg-status-done/5"
                 )}
               >
                 <input
@@ -308,47 +278,52 @@ export function ImportModal({ isOpen, onClose, onImportSuccess }) {
                   id="excel-file-upload"
                   className="absolute inset-0 opacity-0 cursor-pointer"
                   accept=".xls"
+                  multiple
                   onChange={handleFileChange}
                   disabled={importing}
                 />
-                
-                {file ? (
-                  <>
-                    <div className="size-12 rounded-2xl bg-status-done/10 flex items-center justify-center text-accent animate-in zoom-in-95">
-                      <FileSpreadsheet className="size-6" />
-                    </div>
-                    <div className="text-center">
-                      <p className="text-xs font-bold text-foreground truncate max-w-[300px]">
-                        {file.name}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground font-semibold mt-1">
-                        {(file.size / 1024).toFixed(1)} KB — Prêt pour l'import
-                      </p>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="size-12 rounded-2xl bg-primary/5 flex items-center justify-center text-primary/40">
-                      <Upload className="size-6" />
-                    </div>
-                    <div className="text-center">
-                      <p className="text-xs font-bold text-foreground">
-                        Glissez-déposez votre fichier ici, ou cliquez pour parcourir
-                      </p>
-                      <p className="text-[10px] text-muted-foreground font-medium mt-1">
-                        Seuls les fichiers .xls sont acceptés (xls-files)
-                      </p>
-                    </div>
-                  </>
-                )}
+
+                <div className="size-10 rounded-2xl bg-primary/5 flex items-center justify-center text-primary/40">
+                  <Upload className="size-5" />
+                </div>
+                <div className="text-center">
+                  <p className="text-xs font-bold text-foreground">
+                    Glissez-déposez vos fichiers ici, ou cliquez pour parcourir
+                  </p>
+                  <p className="text-[10px] text-muted-foreground font-medium mt-1">
+                    Plusieurs fichiers .xls acceptés (10 max, 50 MB chacun)
+                  </p>
+                </div>
               </div>
+
+              {/* File list */}
+              {files.length > 0 && (
+                <div className="border border-border rounded-xl divide-y divide-border bg-background/50 max-h-[150px] overflow-y-auto custom-scrollbar">
+                  {files.map((f, i) => (
+                    <div key={i} className="flex items-center justify-between px-3 py-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileSpreadsheet className="size-3.5 text-accent shrink-0" />
+                        <span className="text-[11px] font-semibold text-foreground truncate">{f.name}</span>
+                        <span className="text-[9px] text-muted-foreground/60 shrink-0">{(f.size / 1024).toFixed(0)} KB</span>
+                      </div>
+                      <button
+                        onClick={() => removeFile(f.name)}
+                        disabled={importing}
+                        className="ml-2 p-1 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                      >
+                        <Trash2 className="size-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Warning Message */}
             <div className="p-3.5 rounded-xl border border-border bg-muted/40 text-muted-foreground text-xs font-medium flex items-start gap-2.5">
               <AlertCircle className="size-4 shrink-0 text-primary/70 mt-0.5" />
               <span>
-                Si le fichier importé contient des couleurs ambiguës ou des cellules à 0 heure, certaines erreurs peuvent apparaître après l'import.
+                Si un fichier contient des couleurs ambiguës ou des cellules à 0 heure, des avertissements peuvent apparaître après l'import.
               </span>
             </div>
 
@@ -362,18 +337,18 @@ export function ImportModal({ isOpen, onClose, onImportSuccess }) {
 
             {/* Footer Buttons */}
             <div className="flex gap-3 mt-8">
-              <Button 
-                variant="outline" 
-                onClick={onClose} 
+              <Button
+                variant="outline"
+                onClick={onClose}
                 className="flex-1 rounded-xl font-bold uppercase tracking-widest text-[10px]"
                 disabled={importing}
               >
                 Annuler
               </Button>
-              <Button 
-                onClick={handleUpload} 
+              <Button
+                onClick={handleUpload}
                 className="flex-1 rounded-xl font-bold uppercase tracking-widest text-[10px]"
-                disabled={importing || !file || !selectedYearId}
+                disabled={importing || files.length === 0 || !selectedYearId}
               >
                 {importing ? (
                   <>
@@ -381,48 +356,11 @@ export function ImportModal({ isOpen, onClose, onImportSuccess }) {
                     Importation...
                   </>
                 ) : (
-                  "Importer le planning"
+                  `Importer ${files.length > 1 ? `${files.length} fichiers` : "le fichier"}`
                 )}
               </Button>
             </div>
 
-          </div>
-        ) : (
-          /* Success Screen */
-          <div className="space-y-6 text-center py-4 animate-in zoom-in-95 duration-200">
-            <div className="size-16 rounded-full bg-status-done/10 text-accent flex items-center justify-center mx-auto shadow-sm">
-              <Check className="size-8" />
-            </div>
-            
-            <div>
-              <h4 className="text-base font-bold text-foreground">Importation Réussie !</h4>
-              <p className="text-xs text-muted-foreground font-medium mt-2">
-                {successData.message}
-              </p>
-            </div>
-
-            {successData.importedLogs && successData.importedLogs.length > 0 && (
-              <div className="max-h-[160px] overflow-y-auto border border-border rounded-xl divide-y divide-border bg-background/50 custom-scrollbar text-left">
-                {successData.importedLogs.map((log, index) => (
-                  <div key={index} className="p-3 text-[11px] font-semibold flex items-center justify-between">
-                    <div>
-                      <p className="text-foreground">{log.filiere}</p>
-                      <p className="text-muted-foreground/60 text-[9px] mt-0.5">{log.classe}</p>
-                    </div>
-                    <span className="px-2 py-0.5 bg-primary/10 text-primary text-[9px] rounded-md uppercase font-bold">
-                      {log.unitsCount} unités
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <Button 
-              onClick={onClose} 
-              className="w-full rounded-xl font-bold uppercase tracking-widest text-[10px]"
-            >
-              Fermer
-            </Button>
           </div>
         )}
 
